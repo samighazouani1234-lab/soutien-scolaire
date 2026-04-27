@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { data } from "../data/courses"; // ✅ chemin corrigé
+import { data } from "../data/courses";
 
 export default function Home() {
   const [matiere, setMatiere] = useState("");
@@ -10,18 +10,16 @@ export default function Home() {
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // 🔥 niveaux dynamiques (flatten)
   const niveaux = matiere
-    ? Object.values(data[matiere])
-        .flatMap((cat: any) => Object.keys(cat))
+    ? Object.values(data[matiere]).flatMap((cat: any) =>
+        Object.keys(cat)
+      )
     : [];
 
-  // 🔥 chapitres dynamiques
   let chapitres: string[] = [];
 
   if (matiere && niveau) {
     const categories = data[matiere];
-
     for (const cat in categories) {
       if (categories[cat][niveau]) {
         chapitres = categories[cat][niveau];
@@ -40,13 +38,7 @@ export default function Home() {
 
     const question = `
 Cours complet de ${matiere} niveau ${niveau} sur ${chapitre}
-
-Fais :
-1. Explication simple
-2. Exemple
-3. 3 exercices
-4. Correction
-5. Petit test final
+avec explication, exemple, exercices et correction
 `;
 
     const res = await fetch("/api/ia", {
@@ -64,87 +56,164 @@ Fais :
 
   return (
     <main style={styles.page}>
-      <h1 style={styles.title}>🎓 EduAI</h1>
+      
+      {/* HEADER */}
+      <header style={styles.header}>
+        <h2 style={{ fontWeight: "bold" }}>🎓 EduAI</h2>
+        <div>
+          <button style={styles.navBtn}>Accueil</button>
+          <button style={styles.navBtn}>Dashboard</button>
+        </div>
+      </header>
 
-      <div style={styles.card}>
-        <h2>Générateur IA</h2>
+      {/* HERO */}
+      <section style={styles.hero}>
+        
+        {/* LEFT */}
+        <div style={styles.left}>
+          <span style={styles.badge}>Soutien scolaire premium</span>
 
-        {/* MATIERE */}
-        <select style={styles.input} onChange={(e) => setMatiere(e.target.value)}>
-          <option>Matière</option>
-          {Object.keys(data).map((m) => (
-            <option key={m}>{m}</option>
-          ))}
-        </select>
+          <h1 style={styles.title}>
+            Une IA qui t’explique vraiment tes cours.
+          </h1>
 
-        {/* NIVEAU */}
-        <select style={styles.input} onChange={(e) => setNiveau(e.target.value)}>
-          <option>Niveau</option>
-          {niveaux.map((n) => (
-            <option key={n}>{n}</option>
-          ))}
-        </select>
+          <p style={styles.subtitle}>
+            Génère des cours, exercices et corrections automatiquement.
+          </p>
+        </div>
 
-        {/* CHAPITRE */}
-        <select style={styles.input} onChange={(e) => setChapitre(e.target.value)}>
-          <option>Chapitre</option>
-          {chapitres.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </select>
+        {/* CARD */}
+        <div style={styles.card}>
+          <h3 style={{ marginBottom: 10 }}>
+            🤖 Générateur intelligent
+          </h3>
 
-        <button style={styles.btn} onClick={generate}>
-          {loading ? "⏳..." : "✨ Générer"}
-        </button>
+          <select style={styles.input} onChange={(e) => setMatiere(e.target.value)}>
+            <option>Matière</option>
+            {Object.keys(data).map((m) => (
+              <option key={m}>{m}</option>
+            ))}
+          </select>
 
-        {answer && (
-          <div style={styles.result}>
-            <pre>{answer}</pre>
-          </div>
-        )}
-      </div>
+          <select style={styles.input} onChange={(e) => setNiveau(e.target.value)}>
+            <option>Niveau</option>
+            {niveaux.map((n) => (
+              <option key={n}>{n}</option>
+            ))}
+          </select>
+
+          <select style={styles.input} onChange={(e) => setChapitre(e.target.value)}>
+            <option>Chapitre</option>
+            {chapitres.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+
+          <button style={styles.btn} onClick={generate}>
+            {loading ? "⏳ Génération..." : "✨ Générer"}
+          </button>
+
+          {answer && (
+            <div style={styles.result}>
+              <pre style={{ whiteSpace: "pre-wrap" }}>{answer}</pre>
+            </div>
+          )}
+        </div>
+      </section>
     </main>
   );
 }
 
+/* 🎨 STYLES PREMIUM */
 const styles: any = {
   page: {
     minHeight: "100vh",
-    background: "#0f172a",
+    background: "#f8fafc",
+    color: "#0f172a",
+    padding: 30,
+    fontFamily: "Inter, Arial",
+  },
+
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginBottom: 40,
+  },
+
+  navBtn: {
+    marginLeft: 10,
+    padding: "8px 14px",
+    borderRadius: 10,
+    border: "1px solid #e2e8f0",
+    background: "white",
+    cursor: "pointer",
+  },
+
+  hero: {
+    display: "flex",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 40,
+  },
+
+  left: {
+    maxWidth: 500,
+  },
+
+  badge: {
+    background: "#6366f1",
     color: "white",
-    padding: 40,
-  },
-  title: {
-    fontSize: 40,
-    marginBottom: 20,
-  },
-  card: {
-    background: "#1e293b",
-    padding: 20,
+    padding: "6px 12px",
     borderRadius: 20,
-    maxWidth: 400,
+    fontSize: 14,
   },
+
+  title: {
+    fontSize: 42,
+    marginTop: 20,
+    fontWeight: "bold",
+  },
+
+  subtitle: {
+    marginTop: 10,
+    color: "#64748b",
+  },
+
+  card: {
+    background: "white",
+    padding: 25,
+    borderRadius: 20,
+    width: 380,
+    boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+  },
+
   input: {
     width: "100%",
     marginTop: 10,
-    padding: 10,
+    padding: 12,
     borderRadius: 10,
+    border: "1px solid #e2e8f0",
   },
+
   btn: {
     marginTop: 20,
     width: "100%",
-    padding: 12,
-    background: "#facc15",
+    padding: 14,
+    background: "#6366f1",
+    color: "white",
     borderRadius: 10,
     border: "none",
     fontWeight: "bold",
+    cursor: "pointer",
   },
+
   result: {
     marginTop: 20,
-    background: "#020617",
-    padding: 10,
+    background: "#f1f5f9",
+    padding: 12,
     borderRadius: 10,
     maxHeight: 300,
     overflow: "auto",
+    fontSize: 14,
   },
-};
+};/
