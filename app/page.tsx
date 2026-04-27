@@ -12,19 +12,16 @@ export default function Home() {
 
   const niveaux = useMemo(() => {
     if (!matiere) return [];
-    return Object.values(data[matiere]).flatMap((cat: any) =>
-      Object.keys(cat)
-    );
+    return Object.values(data[matiere]).flatMap((cat: any) => Object.keys(cat));
   }, [matiere]);
 
   const chapitres = useMemo(() => {
     if (!matiere || !niveau) return [];
     const categories = data[matiere];
-    let list: string[] = [];
     for (const cat in categories) {
-      if (categories[cat][niveau]) list = categories[cat][niveau];
+      if (categories[cat][niveau]) return categories[cat][niveau];
     }
-    return list;
+    return [];
   }, [matiere, niveau]);
 
   async function generate() {
@@ -32,23 +29,26 @@ export default function Home() {
       alert("Choisis matière, niveau et chapitre");
       return;
     }
+
     setLoading(true);
     setAnswer("");
 
     const question = `
 Cours complet de ${matiere}, niveau ${niveau}, chapitre ${chapitre}.
 Donne :
-1. Cours détaillé (clair)
-2. Définitions
+1. Cours détaillé
+2. Définitions simples
 3. Exemples corrigés
 4. Exercices progressifs
 5. Corrections détaillées
-6. Évaluation finale + barème /10
+6. Évaluation finale avec barème sur 10
 `;
 
     const res = await fetch("/api/ia", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ question }),
     });
 
@@ -58,49 +58,45 @@ Donne :
   }
 
   return (
-    <main style={s.page}>
-      {/* NAV */}
-      <header style={s.header}>
-        <div style={s.headerInner}>
-          <div style={s.logo}>🤖 EduAI</div>
-          <nav style={s.nav}>
-            <a href="#features" style={s.navLink}>Fonctionnalités</a>
-            <a href="#parcours" style={s.navLink}>Parcours</a>
-            <a href="#pricing" style={s.navLink}>Tarifs</a>
-            <a href="#faq" style={s.navLink}>FAQ</a>
-            <a href="#ia" style={s.ctaSmall}>Commencer</a>
-          </nav>
-        </div>
-      </header>
+    <main style={styles.page}>
+      <section style={styles.hero}>
+        <nav style={styles.nav}>
+          <div style={styles.logo}>🤖 EduAI</div>
+          <div style={styles.navLinks}>
+            <a href="#ia" style={styles.link}>Générateur</a>
+            <a href="#features" style={styles.link}>Avantages</a>
+            <a href="#pricing" style={styles.link}>Tarifs</a>
+            <a href="#ia" style={styles.ctaSmall}>Commencer</a>
+          </div>
+        </nav>
 
-      {/* HERO */}
-      <section style={s.hero}>
-        <div style={s.heroGrid}>
-          <div style={s.heroLeft}>
-            <span style={s.badge}>✨ IA éducative nouvelle génération</span>
-            <h1 style={s.title}>
-              Apprends plus vite
-              <br />
-              avec une IA scolaire.
+        <div style={styles.heroContent}>
+          <div style={styles.left}>
+            <span style={styles.badge}>✨ IA éducative premium</span>
+
+            <h1 style={styles.title}>
+              Apprends plus vite avec une IA scolaire.
             </h1>
-            <p style={s.subtitle}>
-              Cours clairs, exercices corrigés, évaluations intelligentes.
-              Du collège à la prépa.
+
+            <p style={styles.subtitle}>
+              Génère des cours détaillés, exercices corrigés et évaluations du collège à la prépa.
             </p>
 
-            <div style={s.heroCards}>
-              <div style={s.card}>🎓 Collège → Prépa</div>
-              <div style={s.card}>✍️ Exercices auto</div>
-              <div style={s.card}>📈 Progression</div>
+            <div style={styles.heroCards}>
+              <div style={styles.miniCard}>🎓 Collège → Prépa</div>
+              <div style={styles.miniCard}>📚 Maths · Physique · Chimie</div>
+              <div style={styles.miniCard}>✅ Corrections incluses</div>
             </div>
           </div>
 
-          {/* GENERATOR */}
-          <div id="ia" style={s.generator}>
-            <h2 style={s.genTitle}>🤖 Générateur IA</h2>
+          <div id="ia" style={styles.generator}>
+            <h2 style={styles.generatorTitle}>🤖 Générateur de cours</h2>
+            <p style={styles.generatorText}>
+              Choisis une matière, un niveau et un chapitre.
+            </p>
 
             <select
-              style={s.input}
+              style={styles.input}
               value={matiere}
               onChange={(e) => {
                 setMatiere(e.target.value);
@@ -108,250 +104,317 @@ Donne :
                 setChapitre("");
               }}
             >
-              <option value="">Matière</option>
+              <option value="">Choisir une matière</option>
               {Object.keys(data).map((m) => (
-                <option key={m}>{m}</option>
+                <option key={m} value={m}>{m}</option>
               ))}
             </select>
 
             <select
-              style={s.input}
+              style={styles.input}
               value={niveau}
               onChange={(e) => {
                 setNiveau(e.target.value);
                 setChapitre("");
               }}
             >
-              <option value="">Niveau</option>
+              <option value="">Choisir un niveau</option>
               {niveaux.map((n) => (
-                <option key={n}>{n}</option>
+                <option key={n} value={n}>{n}</option>
               ))}
             </select>
 
             <select
-              style={s.input}
+              style={styles.input}
               value={chapitre}
               onChange={(e) => setChapitre(e.target.value)}
             >
-              <option value="">Chapitre</option>
+              <option value="">Choisir un chapitre</option>
               {chapitres.map((c) => (
-                <option key={c}>{c}</option>
+                <option key={c} value={c}>{c}</option>
               ))}
             </select>
 
-            <button style={s.button} onClick={generate}>
-              {loading ? "⏳ Génération..." : "✨ Générer mon cours"}
+            <button onClick={generate} style={styles.button}>
+              {loading ? "⏳ Génération en cours..." : "✨ Générer mon cours"}
             </button>
 
             {answer && (
-              <div style={s.result}>
-                <pre style={s.pre}>{answer}</pre>
+              <div style={styles.result}>
+                <h3 style={{ marginTop: 0 }}>📘 Cours généré</h3>
+                <pre style={styles.pre}>{answer}</pre>
               </div>
             )}
           </div>
         </div>
       </section>
 
-      {/* FEATURES */}
-      <section id="features" style={s.section}>
-        <h2 style={s.sectionTitle}>Pourquoi choisir EduAI ?</h2>
-        <div style={s.grid3}>
-          <div style={s.feature}>
-            ⚡ Génération instantanée
-            <p>Un cours complet en quelques secondes</p>
-          </div>
-          <div style={s.feature}>
-            🧠 Adaptatif
-            <p>Contenu adapté à ton niveau réel</p>
-          </div>
-          <div style={s.feature}>
-            📊 Progression
-            <p>Suivi et amélioration continue</p>
-          </div>
+      <section id="features" style={styles.features}>
+        <h2 style={styles.sectionTitle}>Pourquoi EduAI ?</h2>
+
+        <div style={styles.grid}>
+          <div style={styles.featureCard}>⚡ Cours générés rapidement</div>
+          <div style={styles.featureCard}>🧠 Explications adaptées</div>
+          <div style={styles.featureCard}>✍️ Exercices automatiques</div>
+          <div style={styles.featureCard}>📊 Évaluation finale</div>
         </div>
       </section>
 
-      {/* PARCOURS */}
-      <section id="parcours" style={s.sectionAlt}>
-        <h2 style={s.sectionTitle}>Tous les niveaux</h2>
-        <div style={s.grid4}>
-          <div style={s.level}>Collège</div>
-          <div style={s.level}>Lycée</div>
-          <div style={s.level}>Prépa</div>
-          <div style={s.level}>Grandes écoles</div>
-        </div>
-      </section>
+      <section id="pricing" style={styles.pricing}>
+        <h2 style={styles.sectionTitle}>Formules</h2>
 
-      {/* TESTIMONIAL */}
-      <section style={s.section}>
-        <h2 style={s.sectionTitle}>Ils progressent avec nous</h2>
-        <div style={s.grid3}>
-          <div style={s.testimonial}>“J’ai gagné 4 points en maths !”</div>
-          <div style={s.testimonial}>“Meilleur que mes cours”</div>
-          <div style={s.testimonial}>“Incroyable pour la prépa”</div>
-        </div>
-      </section>
-
-      {/* PRICING */}
-      <section id="pricing" style={s.sectionAlt}>
-        <h2 style={s.sectionTitle}>Tarifs</h2>
-        <div style={s.grid3}>
-          <div style={s.priceCard}>
-            Gratuit
-            <p>Accès limité</p>
+        <div style={styles.grid}>
+          <div style={styles.priceCard}>
+            <h3>Découverte</h3>
+            <p>Gratuit</p>
           </div>
-          <div style={s.priceCardMain}>
-            Pro
+          <div style={styles.priceCardPro}>
+            <h3>Pro</h3>
             <p>IA illimitée</p>
           </div>
-          <div style={s.priceCard}>
-            Premium
-            <p>Coaching + IA</p>
+          <div style={styles.priceCard}>
+            <h3>Premium</h3>
+            <p>IA + visio prof</p>
           </div>
         </div>
       </section>
-
-      {/* FAQ */}
-      <section id="faq" style={s.section}>
-        <h2 style={s.sectionTitle}>FAQ</h2>
-        <div style={s.faq}>Est-ce vraiment utile ? → Oui</div>
-        <div style={s.faq}>Est-ce difficile ? → Non</div>
-        <div style={s.faq}>Remplace un prof ? → Non, complète</div>
-      </section>
-
-      {/* FOOTER */}
-      <footer style={s.footer}>
-        © 2026 EduAI — Tous droits réservés
-      </footer>
     </main>
   );
 }
 
-const s: any = {
-  page: { fontFamily: "Inter, Arial", margin: 0 },
-
-  header: {
-    position: "fixed",
-    width: "100%",
-    backdropFilter: "blur(10px)",
-    background: "rgba(255,255,255,0.7)",
-    zIndex: 10,
-  },
-  headerInner: {
-    maxWidth: 1200,
-    margin: "0 auto",
-    display: "flex",
-    justifyContent: "space-between",
-    padding: 16,
-  },
-  logo: { fontWeight: 900 },
-  nav: { display: "flex", gap: 20, alignItems: "center" },
-  navLink: { textDecoration: "none", color: "#333" },
-  ctaSmall: {
-    background: "#7c3aed",
+const styles: any = {
+  page: {
+    margin: 0,
+    fontFamily: "Inter, Arial, sans-serif",
+    background: "#0f172a",
     color: "white",
-    padding: "8px 14px",
-    borderRadius: 10,
   },
 
   hero: {
     minHeight: "100vh",
     backgroundImage: `
-      linear-gradient(rgba(255,255,255,0.9), rgba(255,255,255,0.6)),
+      linear-gradient(
+        120deg,
+        rgba(88,28,135,0.92),
+        rgba(37,99,235,0.72),
+        rgba(14,165,233,0.35)
+      ),
       url('/hero.png')
     `,
     backgroundSize: "cover",
-    paddingTop: 100,
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+    padding: 24,
   },
-  heroGrid: {
-    display: "grid",
-    gridTemplateColumns: "1fr 400px",
-    gap: 40,
-    maxWidth: 1200,
+
+  nav: {
+    maxWidth: 1280,
     margin: "0 auto",
+    padding: "18px 24px",
+    borderRadius: 24,
+    background: "rgba(15,23,42,0.45)",
+    backdropFilter: "blur(20px)",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    boxShadow: "0 20px 70px rgba(0,0,0,0.25)",
+    border: "1px solid rgba(255,255,255,0.18)",
   },
 
-  heroLeft: {},
-  badge: { background: "#eee", padding: 10, borderRadius: 20 },
-  title: { fontSize: 60, margin: "20px 0" },
-  subtitle: { fontSize: 20, color: "#555" },
+  logo: {
+    fontSize: 26,
+    fontWeight: 900,
+  },
 
-  heroCards: { display: "flex", gap: 10 },
-  card: { background: "#fff", padding: 10, borderRadius: 10 },
+  navLinks: {
+    display: "flex",
+    gap: 20,
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+
+  link: {
+    color: "#e0f2fe",
+    textDecoration: "none",
+    fontWeight: 800,
+  },
+
+  ctaSmall: {
+    background: "linear-gradient(90deg,#facc15,#fb7185)",
+    color: "#0f172a",
+    padding: "12px 18px",
+    borderRadius: 16,
+    fontWeight: 900,
+    textDecoration: "none",
+  },
+
+  heroContent: {
+    maxWidth: 1280,
+    margin: "80px auto 0",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+    gap: 40,
+    alignItems: "center",
+  },
+
+  left: {
+    maxWidth: 650,
+  },
+
+  badge: {
+    background: "rgba(255,255,255,0.18)",
+    color: "white",
+    padding: "10px 16px",
+    borderRadius: 999,
+    fontWeight: 900,
+    display: "inline-block",
+    border: "1px solid rgba(255,255,255,0.22)",
+  },
+
+  title: {
+    fontSize: "clamp(46px, 8vw, 82px)",
+    lineHeight: 1,
+    letterSpacing: -3,
+    margin: "28px 0",
+    color: "white",
+    textShadow: "0 10px 40px rgba(0,0,0,0.35)",
+  },
+
+  subtitle: {
+    fontSize: 22,
+    lineHeight: 1.6,
+    color: "#e0f2fe",
+    maxWidth: 620,
+  },
+
+  heroCards: {
+    display: "flex",
+    gap: 16,
+    flexWrap: "wrap",
+    marginTop: 34,
+  },
+
+  miniCard: {
+    background: "rgba(255,255,255,0.16)",
+    color: "white",
+    padding: 18,
+    borderRadius: 20,
+    fontWeight: 900,
+    border: "1px solid rgba(255,255,255,0.22)",
+    backdropFilter: "blur(14px)",
+  },
 
   generator: {
-    background: "white",
-    padding: 20,
-    borderRadius: 20,
-    boxShadow: "0 20px 50px rgba(0,0,0,0.1)",
+    background:
+      "linear-gradient(180deg, rgba(255,255,255,0.94), rgba(239,246,255,0.9))",
+    color: "#0f172a",
+    backdropFilter: "blur(20px)",
+    padding: 30,
+    borderRadius: 34,
+    boxShadow: "0 35px 100px rgba(0,0,0,0.28)",
+    border: "1px solid rgba(255,255,255,0.65)",
   },
-  genTitle: { marginTop: 0 },
+
+  generatorTitle: {
+    marginTop: 0,
+    marginBottom: 8,
+    fontSize: 30,
+  },
+
+  generatorText: {
+    color: "#64748b",
+    marginBottom: 18,
+  },
 
   input: {
     width: "100%",
-    padding: 12,
-    marginTop: 10,
-    borderRadius: 10,
-    border: "1px solid #ddd",
+    padding: 16,
+    borderRadius: 18,
+    border: "1px solid #cbd5e1",
+    marginTop: 14,
+    fontSize: 16,
+    boxSizing: "border-box",
+    background: "white",
+    color: "#0f172a",
   },
 
   button: {
     width: "100%",
-    marginTop: 15,
-    padding: 12,
-    background: "#7c3aed",
+    marginTop: 22,
+    padding: 18,
+    borderRadius: 20,
+    border: 0,
+    background: "linear-gradient(90deg,#7c3aed,#2563eb,#06b6d4)",
     color: "white",
-    border: "none",
-    borderRadius: 10,
+    fontWeight: 900,
+    fontSize: 16,
+    cursor: "pointer",
+    boxShadow: "0 16px 40px rgba(37,99,235,0.35)",
   },
 
   result: {
-    marginTop: 10,
-    background: "#111",
+    marginTop: 24,
+    background: "#0f172a",
     color: "white",
-    padding: 10,
-    borderRadius: 10,
-    maxHeight: 200,
+    padding: 20,
+    borderRadius: 22,
+    maxHeight: 360,
     overflow: "auto",
+    fontSize: 14,
   },
 
-  pre: { whiteSpace: "pre-wrap" },
-
-  section: { padding: 60, textAlign: "center" },
-  sectionAlt: { padding: 60, background: "#f1f5f9", textAlign: "center" },
-
-  sectionTitle: { fontSize: 32 },
-
-  grid3: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))",
-    gap: 20,
-    marginTop: 30,
-  },
-  grid4: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
-    gap: 20,
-    marginTop: 30,
+  pre: {
+    whiteSpace: "pre-wrap",
+    margin: 0,
+    fontFamily: "Inter, Arial, sans-serif",
+    lineHeight: 1.7,
   },
 
-  feature: { background: "white", padding: 20, borderRadius: 10 },
-  level: { background: "white", padding: 20, borderRadius: 10 },
-  testimonial: { background: "white", padding: 20 },
-
-  priceCard: { background: "white", padding: 20 },
-  priceCardMain: {
-    background: "#7c3aed",
-    color: "white",
-    padding: 20,
+  features: {
+    padding: "80px 24px",
+    background: "linear-gradient(180deg,#0f172a,#1e293b)",
   },
 
-  faq: { marginTop: 10 },
+  pricing: {
+    padding: "80px 24px",
+    background: "#f8fafc",
+    color: "#0f172a",
+  },
 
-  footer: {
-    padding: 20,
+  sectionTitle: {
     textAlign: "center",
-    background: "#111",
+    fontSize: "clamp(34px,5vw,54px)",
+    marginBottom: 40,
+  },
+
+  grid: {
+    maxWidth: 1100,
+    margin: "0 auto",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: 20,
+  },
+
+  featureCard: {
+    background: "rgba(255,255,255,0.09)",
+    padding: 26,
+    borderRadius: 26,
+    fontWeight: 900,
+    border: "1px solid rgba(255,255,255,0.14)",
+  },
+
+  priceCard: {
+    background: "white",
+    padding: 28,
+    borderRadius: 28,
+    boxShadow: "0 20px 60px rgba(15,23,42,0.08)",
+  },
+
+  priceCardPro: {
+    background: "linear-gradient(135deg,#7c3aed,#2563eb)",
     color: "white",
+    padding: 28,
+    borderRadius: 28,
+    boxShadow: "0 24px 80px rgba(37,99,235,0.25)",
   },
 };
