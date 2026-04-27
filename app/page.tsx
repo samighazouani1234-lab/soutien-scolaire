@@ -240,3 +240,15 @@ const styles: any = {
     borderRadius: 10,
   },
 };
+const [question, setQuestion] = useState("");
+const [answer, setAnswer] = useState("");
+
+async function askAI() {
+  const res = await fetch("/api/ia", {
+    method: "POST",
+    body: JSON.stringify({ question }),
+  });
+
+  const data = await res.json();
+  setAnswer(data.answer);
+}
