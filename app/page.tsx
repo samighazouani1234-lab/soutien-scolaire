@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { data } from "@/data/courses";
+import { data } from "../data/courses"; // ✅ chemin corrigé
 
 export default function Home() {
   const [matiere, setMatiere] = useState("");
@@ -10,16 +10,28 @@ export default function Home() {
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // niveaux dynamiques
-  const niveaux = matiere ? Object.keys(data[matiere]) : [];
+  // 🔥 niveaux dynamiques (flatten)
+  const niveaux = matiere
+    ? Object.values(data[matiere])
+        .flatMap((cat: any) => Object.keys(cat))
+    : [];
 
-  // chapitres dynamiques
-  const chapitres =
-    matiere && niveau ? data[matiere][niveau] : [];
+  // 🔥 chapitres dynamiques
+  let chapitres: string[] = [];
+
+  if (matiere && niveau) {
+    const categories = data[matiere];
+
+    for (const cat in categories) {
+      if (categories[cat][niveau]) {
+        chapitres = categories[cat][niveau];
+      }
+    }
+  }
 
   async function generate() {
     if (!matiere || !niveau || !chapitre) {
-      alert("Choisis matière, niveau et chapitre");
+      alert("Choisis tout !");
       return;
     }
 
@@ -28,12 +40,13 @@ export default function Home() {
 
     const question = `
 Cours complet de ${matiere} niveau ${niveau} sur ${chapitre}
-avec :
-- explication simple
-- exemple
-- exercices
-- corrections
-- évaluation
+
+Fais :
+1. Explication simple
+2. Exemple
+3. 3 exercices
+4. Correction
+5. Petit test final
 `;
 
     const res = await fetch("/api/ia", {
@@ -45,93 +58,51 @@ avec :
     });
 
     const dataRes = await res.json();
-    setAnswer(dataRes.answer);
+    setAnswer(dataRes.answer || "Erreur IA");
     setLoading(false);
   }
 
   return (
     <main style={styles.page}>
-      
-      {/* HEADER */}
-      <header style={styles.header}>
-        <h2>🎓 EduAI</h2>
-        <div>
-          <button style={styles.navBtn}>Accueil</button>
-          <button style={styles.navBtn}>Mon espace</button>
-        </div>
-      </header>
+      <h1 style={styles.title}>🎓 EduAI</h1>
 
-      {/* HERO */}
-      <section style={styles.hero}>
-        <div style={styles.left}>
-          <span style={styles.badge}>Soutien scolaire premium</span>
+      <div style={styles.card}>
+        <h2>Générateur IA</h2>
 
-          <h1 style={styles.title}>
-            Apprends du collège à la prépa avec une IA.
-          </h1>
+        {/* MATIERE */}
+        <select style={styles.input} onChange={(e) => setMatiere(e.target.value)}>
+          <option>Matière</option>
+          {Object.keys(data).map((m) => (
+            <option key={m}>{m}</option>
+          ))}
+        </select>
 
-          <p style={styles.subtitle}>
-            Maths, physique, chimie, cours détaillés + exercices + corrections.
-          </p>
-        </div>
+        {/* NIVEAU */}
+        <select style={styles.input} onChange={(e) => setNiveau(e.target.value)}>
+          <option>Niveau</option>
+          {niveaux.map((n) => (
+            <option key={n}>{n}</option>
+          ))}
+        </select>
 
-        {/* CARD IA */}
-        <div style={styles.card}>
-          <h3>🤖 Générateur de cours</h3>
+        {/* CHAPITRE */}
+        <select style={styles.input} onChange={(e) => setChapitre(e.target.value)}>
+          <option>Chapitre</option>
+          {chapitres.map((c) => (
+            <option key={c}>{c}</option>
+          ))}
+        </select>
 
-          {/* MATIERE */}
-          <select
-            style={styles.input}
-            onChange={(e) => {
-              setMatiere(e.target.value);
-              setNiveau("");
-              setChapitre("");
-            }}
-          >
-            <option>Choisir matière</option>
-            {Object.keys(data).map((m) => (
-              <option key={m}>{m}</option>
-            ))}
-          </select>
+        <button style={styles.btn} onClick={generate}>
+          {loading ? "⏳..." : "✨ Générer"}
+        </button>
 
-          {/* NIVEAU */}
-          <select
-            style={styles.input}
-            onChange={(e) => {
-              setNiveau(e.target.value);
-              setChapitre("");
-            }}
-          >
-            <option>Choisir niveau</option>
-            {niveaux.map((n) => (
-              <option key={n}>{n}</option>
-            ))}
-          </select>
-
-          {/* CHAPITRE */}
-          <select
-            style={styles.input}
-            onChange={(e) => setChapitre(e.target.value)}
-          >
-            <option>Choisir chapitre</option>
-            {chapitres.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-
-          {/* BUTTON */}
-          <button style={styles.btn} onClick={generate}>
-            {loading ? "⏳ Génération..." : "✨ Générer"}
-          </button>
-
-          {/* RESULT */}
-          {answer && (
-            <div style={styles.result}>
-              <pre style={{ whiteSpace: "pre-wrap" }}>{answer}</pre>
-            </div>
-          )}
-        </div>
-      </section>
+        {answer && (
+          <div style={styles.result}>
+            <pre>{answer}</pre>
+          </div>
+        )}
+      </div>
     </main>
   );
 }
@@ -139,83 +110,41 @@ avec :
 const styles: any = {
   page: {
     minHeight: "100vh",
-    background: "linear-gradient(135deg,#0f172a,#1e293b)",
+    background: "#0f172a",
     color: "white",
-    padding: "30px",
-    fontFamily: "Arial",
+    padding: 40,
   },
-
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    marginBottom: "40px",
-  },
-
-  navBtn: {
-    marginLeft: "10px",
-    padding: "8px 12px",
-    borderRadius: "8px",
-    border: "none",
-  },
-
-  hero: {
-    display: "flex",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
-    gap: "40px",
-  },
-
-  left: {
-    maxWidth: "500px",
-  },
-
-  badge: {
-    background: "#facc15",
-    color: "black",
-    padding: "6px 12px",
-    borderRadius: "20px",
-  },
-
   title: {
-    fontSize: "40px",
-    marginTop: "20px",
+    fontSize: 40,
+    marginBottom: 20,
   },
-
-  subtitle: {
-    opacity: 0.8,
-    marginTop: "10px",
-  },
-
   card: {
     background: "#1e293b",
-    padding: "20px",
-    borderRadius: "20px",
-    width: "350px",
+    padding: 20,
+    borderRadius: 20,
+    maxWidth: 400,
   },
-
   input: {
     width: "100%",
-    marginTop: "10px",
-    padding: "10px",
-    borderRadius: "10px",
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 10,
   },
-
   btn: {
-    marginTop: "20px",
+    marginTop: 20,
     width: "100%",
-    padding: "12px",
+    padding: 12,
     background: "#facc15",
-    borderRadius: "10px",
+    borderRadius: 10,
     border: "none",
     fontWeight: "bold",
   },
-
   result: {
-    marginTop: "20px",
-    background: "#0f172a",
-    padding: "10px",
-    borderRadius: "10px",
-    maxHeight: "300px",
+    marginTop: 20,
+    background: "#020617",
+    padding: 10,
+    borderRadius: 10,
+    maxHeight: 300,
     overflow: "auto",
   },
 };
