@@ -2,14 +2,42 @@
 
 import { useState } from "react";
 
+const data = {
+  Mathématiques: {
+    "6e": ["Fractions", "Nombres décimaux", "Proportionnalité"],
+    "5e": ["Fractions", "Pourcentages", "Géométrie"],
+    "4e": ["Puissances", "Equations", "Pythagore"],
+    "3e": ["Fonctions", "Statistiques", "Trigonométrie"],
+  },
+  Physique: {
+    "6e": ["Matière", "Energie"],
+    "5e": ["Forces", "Mouvement"],
+    "4e": ["Electricité", "Vitesse"],
+    "3e": ["Ondes", "Optique"],
+  },
+};
+
 export default function Home() {
-  const [question, setQuestion] = useState("");
+  const [matiere, setMatiere] = useState("");
+  const [niveau, setNiveau] = useState("");
+  const [chapitre, setChapitre] = useState("");
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function askAI() {
+  const niveaux = matiere ? Object.keys(data[matiere]) : [];
+  const chapitres =
+    matiere && niveau ? data[matiere][niveau] : [];
+
+  async function generate() {
+    if (!matiere || !niveau || !chapitre) {
+      alert("Choisis tout !");
+      return;
+    }
+
     setLoading(true);
     setAnswer("");
+
+    const question = `${matiere} ${niveau} ${chapitre}`;
 
     const res = await fetch("/api/ia", {
       method: "POST",
@@ -19,175 +47,141 @@ export default function Home() {
       body: JSON.stringify({ question }),
     });
 
-    const data = await res.json();
-    setAnswer(data.answer || "Erreur IA");
+    const dataRes = await res.json();
+    setAnswer(dataRes.answer);
     setLoading(false);
   }
 
   return (
-    <main style={styles.page}>
-      <header style={styles.header}>
-        <div style={styles.logo}>🎓 EduNova IA</div>
-        <a href="#ia" style={styles.headerButton}>Générer un cours</a>
-      </header>
+    <main style={{
+      minHeight: "100vh",
+      background: "linear-gradient(135deg, #0f172a, #1e293b)",
+      color: "white",
+      padding: "40px"
+    }}>
 
-      <section style={styles.hero}>
-        <div>
-          <p style={styles.badge}>Soutien scolaire premium</p>
-          <h1 style={styles.title}>Apprends plus vite avec une IA scolaire.</h1>
-          <p style={styles.subtitle}>
-            Génère des cours détaillés, exercices, corrections et évaluations pour les maths, la physique et plus encore.
+      {/* HERO */}
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        gap: "40px",
+        flexWrap: "wrap"
+      }}>
+
+        {/* LEFT */}
+        <div style={{ maxWidth: "500px" }}>
+          <div style={{
+            background: "#facc15",
+            color: "black",
+            display: "inline-block",
+            padding: "6px 12px",
+            borderRadius: "20px",
+            fontWeight: "bold",
+            marginBottom: "20px"
+          }}>
+            Soutien scolaire premium
+          </div>
+
+          <h1 style={{
+            fontSize: "48px",
+            fontWeight: "bold",
+            lineHeight: "1.2"
+          }}>
+            Apprends plus vite avec une IA scolaire.
+          </h1>
+
+          <p style={{ marginTop: "20px", opacity: 0.8 }}>
+            Cours détaillés, exercices corrigés et évaluations intelligentes.
           </p>
         </div>
 
-        <div id="ia" style={styles.card}>
-          <h2 style={styles.cardTitle}>🤖 Générateur de cours IA</h2>
+        {/* RIGHT CARD */}
+        <div style={{
+          background: "#1e293b",
+          padding: "25px",
+          borderRadius: "20px",
+          width: "400px",
+          boxShadow: "0 0 40px rgba(0,0,0,0.3)"
+        }}>
 
-          <textarea
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Ex : explique les fractions niveau 4e avec exercices corrigés"
-            style={styles.textarea}
-          />
+          <h2 style={{ marginBottom: "20px" }}>
+            🤖 Générateur de cours IA
+          </h2>
+
+          {/* SELECTS */}
+          <select
+            onChange={(e) => setMatiere(e.target.value)}
+            style={inputStyle}
+          >
+            <option>Choisir matière</option>
+            {Object.keys(data).map((m) => (
+              <option key={m}>{m}</option>
+            ))}
+          </select>
+
+          <select
+            onChange={(e) => setNiveau(e.target.value)}
+            style={inputStyle}
+          >
+            <option>Choisir niveau</option>
+            {niveaux.map((n) => (
+              <option key={n}>{n}</option>
+            ))}
+          </select>
+
+          <select
+            onChange={(e) => setChapitre(e.target.value)}
+            style={inputStyle}
+          >
+            <option>Choisir chapitre</option>
+            {chapitres.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
 
           <button
-            onClick={askAI}
-            disabled={loading || !question.trim()}
+            onClick={generate}
             style={{
-              ...styles.button,
-              opacity: loading || !question.trim() ? 0.6 : 1,
+              marginTop: "20px",
+              width: "100%",
+              padding: "12px",
+              background: "#facc15",
+              color: "black",
+              borderRadius: "10px",
+              fontWeight: "bold",
+              border: "none",
+              cursor: "pointer"
             }}
           >
-            {loading ? "⏳ Génération..." : "Générer avec IA"}
+            {loading ? "Chargement..." : "✨ Générer avec IA"}
           </button>
 
+          {/* RESULT */}
           {answer && (
-            <div style={styles.answer}>
-              <h3>📘 Réponse</h3>
-              <p style={{ whiteSpace: "pre-line", lineHeight: 1.7 }}>{answer}</p>
+            <div style={{
+              marginTop: "20px",
+              background: "#0f172a",
+              padding: "15px",
+              borderRadius: "10px",
+              maxHeight: "300px",
+              overflow: "auto",
+              fontSize: "14px"
+            }}>
+              {answer}
             </div>
           )}
         </div>
-      </section>
-
-      <section style={styles.features}>
-        <div style={styles.feature}>📚 Cours détaillés</div>
-        <div style={styles.feature}>✍️ Exercices automatiques</div>
-        <div style={styles.feature}>✅ Corrections</div>
-        <div style={styles.feature}>📝 Évaluations</div>
-      </section>
+      </div>
     </main>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    background:
-      "radial-gradient(circle at top left, #facc1555, transparent 25%), radial-gradient(circle at top right, #3b82f655, transparent 25%), #08111f",
-    color: "white",
-    fontFamily: "Arial, sans-serif",
-    padding: 24,
-  },
-  header: {
-    maxWidth: 1200,
-    margin: "0 auto",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "20px 0",
-  },
-  logo: {
-    fontSize: 24,
-    fontWeight: 900,
-  },
-  headerButton: {
-    background: "white",
-    color: "black",
-    padding: "12px 18px",
-    borderRadius: 999,
-    textDecoration: "none",
-    fontWeight: 800,
-  },
-  hero: {
-    maxWidth: 1200,
-    margin: "60px auto",
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-    gap: 40,
-    alignItems: "center",
-  },
-  badge: {
-    display: "inline-block",
-    background: "#facc15",
-    color: "black",
-    padding: "8px 14px",
-    borderRadius: 999,
-    fontWeight: 800,
-  },
-  title: {
-    fontSize: "clamp(42px, 8vw, 72px)",
-    lineHeight: 1,
-    margin: "24px 0",
-    letterSpacing: -2,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: "#cbd5e1",
-    lineHeight: 1.7,
-  },
-  card: {
-    background: "rgba(255,255,255,0.08)",
-    border: "1px solid rgba(255,255,255,0.15)",
-    borderRadius: 32,
-    padding: 28,
-    boxShadow: "0 30px 80px rgba(0,0,0,0.45)",
-  },
-  cardTitle: {
-    fontSize: 30,
-    marginBottom: 20,
-  },
-  textarea: {
-    width: "100%",
-    minHeight: 160,
-    borderRadius: 22,
-    border: "1px solid rgba(255,255,255,0.18)",
-    background: "rgba(0,0,0,0.35)",
-    color: "white",
-    padding: 18,
-    fontSize: 16,
-    boxSizing: "border-box",
-  },
-  button: {
-    marginTop: 18,
-    width: "100%",
-    padding: 16,
-    borderRadius: 999,
-    border: 0,
-    background: "#facc15",
-    color: "black",
-    fontWeight: 900,
-    fontSize: 16,
-    cursor: "pointer",
-  },
-  answer: {
-    marginTop: 24,
-    background: "rgba(0,0,0,0.35)",
-    padding: 20,
-    borderRadius: 22,
-  },
-  features: {
-    maxWidth: 1200,
-    margin: "60px auto",
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: 16,
-  },
-  feature: {
-    background: "rgba(255,255,255,0.08)",
-    padding: 20,
-    borderRadius: 20,
-    fontWeight: 800,
-    border: "1px solid rgba(255,255,255,0.12)",
-  },
+const inputStyle = {
+  width: "100%",
+  marginTop: "10px",
+  padding: "10px",
+  borderRadius: "10px",
+  border: "none",
+  background: "#0f172a",
+  color: "white"
 };
