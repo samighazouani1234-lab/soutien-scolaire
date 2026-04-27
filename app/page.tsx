@@ -28,17 +28,14 @@ export default function Home() {
   }
 
   async function generate() {
-    if (!matiere || !niveau || !chapitre) {
-      alert("Choisis tout !");
-      return;
-    }
+    if (!matiere || !niveau || !chapitre) return alert("Choisis tout");
 
     setLoading(true);
     setAnswer("");
 
     const question = `
 Cours complet de ${matiere} niveau ${niveau} sur ${chapitre}
-avec explication, exemple, exercices et correction
+avec explication, exemple, exercices, correction et test final
 `;
 
     const res = await fetch("/api/ia", {
@@ -57,36 +54,32 @@ avec explication, exemple, exercices et correction
   return (
     <main style={styles.page}>
       
-      {/* HEADER */}
-      <header style={styles.header}>
-        <h2 style={{ fontWeight: "bold" }}>🎓 EduAI</h2>
+      {/* NAVBAR */}
+      <nav style={styles.nav}>
+        <h2 style={{ fontWeight: "bold" }}>✨ EduAI</h2>
         <div>
           <button style={styles.navBtn}>Accueil</button>
           <button style={styles.navBtn}>Dashboard</button>
         </div>
-      </header>
+      </nav>
 
       {/* HERO */}
       <section style={styles.hero}>
-        
-        {/* LEFT */}
         <div style={styles.left}>
-          <span style={styles.badge}>Soutien scolaire premium</span>
+          <span style={styles.badge}>IA éducative nouvelle génération</span>
 
           <h1 style={styles.title}>
-            Une IA qui t’explique vraiment tes cours.
+            Apprends plus vite avec une IA intelligente.
           </h1>
 
           <p style={styles.subtitle}>
-            Génère des cours, exercices et corrections automatiquement.
+            Du collège à la prépa — cours, exercices et corrections en 1 clic.
           </p>
         </div>
 
         {/* CARD */}
         <div style={styles.card}>
-          <h3 style={{ marginBottom: 10 }}>
-            🤖 Générateur intelligent
-          </h3>
+          <h3 style={{ marginBottom: 15 }}>🤖 Générateur IA</h3>
 
           <select style={styles.input} onChange={(e) => setMatiere(e.target.value)}>
             <option>Matière</option>
@@ -110,7 +103,7 @@ avec explication, exemple, exercices et correction
           </select>
 
           <button style={styles.btn} onClick={generate}>
-            {loading ? "⏳ Génération..." : "✨ Générer"}
+            {loading ? "⏳ Génération..." : "✨ Générer avec IA"}
           </button>
 
           {answer && (
@@ -124,28 +117,30 @@ avec explication, exemple, exercices et correction
   );
 }
 
-/* 🎨 STYLES PREMIUM */
+/* 🎨 ULTRA DESIGN */
 const styles: any = {
   page: {
     minHeight: "100vh",
-    background: "#f8fafc",
-    color: "#0f172a",
-    padding: 30,
+    background: "linear-gradient(135deg,#020617,#0f172a,#1e293b)",
+    color: "white",
+    padding: 40,
     fontFamily: "Inter, Arial",
   },
 
-  header: {
+  nav: {
     display: "flex",
     justifyContent: "space-between",
-    marginBottom: 40,
+    marginBottom: 50,
   },
 
   navBtn: {
     marginLeft: 10,
-    padding: "8px 14px",
-    borderRadius: 10,
-    border: "1px solid #e2e8f0",
-    background: "white",
+    padding: "8px 16px",
+    borderRadius: 12,
+    border: "none",
+    background: "rgba(255,255,255,0.1)",
+    color: "white",
+    backdropFilter: "blur(10px)",
     cursor: "pointer",
   },
 
@@ -161,59 +156,64 @@ const styles: any = {
   },
 
   badge: {
-    background: "#6366f1",
-    color: "white",
-    padding: "6px 12px",
+    background: "linear-gradient(90deg,#6366f1,#8b5cf6)",
+    padding: "6px 14px",
     borderRadius: 20,
     fontSize: 14,
   },
 
   title: {
-    fontSize: 42,
+    fontSize: 44,
     marginTop: 20,
     fontWeight: "bold",
+    lineHeight: "1.2",
   },
 
   subtitle: {
-    marginTop: 10,
-    color: "#64748b",
+    marginTop: 15,
+    color: "#94a3b8",
   },
 
   card: {
-    background: "white",
+    background: "rgba(255,255,255,0.05)",
+    backdropFilter: "blur(20px)",
     padding: 25,
     borderRadius: 20,
     width: 380,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+    border: "1px solid rgba(255,255,255,0.1)",
   },
 
   input: {
     width: "100%",
     marginTop: 10,
     padding: 12,
-    borderRadius: 10,
-    border: "1px solid #e2e8f0",
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,0.1)",
+    background: "rgba(0,0,0,0.3)",
+    color: "white",
   },
 
   btn: {
     marginTop: 20,
     width: "100%",
     padding: 14,
-    background: "#6366f1",
-    color: "white",
-    borderRadius: 10,
+    background: "linear-gradient(90deg,#6366f1,#8b5cf6)",
+    borderRadius: 12,
     border: "none",
     fontWeight: "bold",
+    color: "white",
     cursor: "pointer",
+    transition: "0.3s",
   },
 
   result: {
     marginTop: 20,
-    background: "#f1f5f9",
+    background: "rgba(0,0,0,0.4)",
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     maxHeight: 300,
     overflow: "auto",
     fontSize: 14,
   },
-};/
+};
