@@ -6,19 +6,24 @@ export async function POST(req: Request) {
   return NextResponse.json({
     answer: `📘 Cours sur : ${question}
 
-1. Explication simple :
-Le sujet "${question}" doit être compris étape par étape.
+🎯 Objectif :
+Comprendre ce chapitre simplement.
 
-2. Exemple :
-On commence par identifier les notions importantes, puis on applique la méthode.
+🧠 Explication :
+On commence par définir le sujet, puis on applique une méthode étape par étape.
 
-3. Exercice :
-Explique le sujet "${question}" avec tes propres mots.
+✅ Exemple :
+Pour "${question}", il faut identifier les mots importants, puis résoudre avec une méthode claire.
 
-4. Correction :
-Il faut donner une définition claire, un exemple et une méthode.
+✏️ Exercice :
+Explique "${question}" avec tes propres mots et donne un exemple.
 
-5. Évaluation :
-Réponds à 3 questions sur ce chapitre pour vérifier ta compréhension.`
+📝 Correction :
+Une bonne réponse contient une définition, une méthode et un exemple.
+
+📊 Évaluation :
+1. Définis le sujet.
+2. Donne un exemple.
+3. Résous un exercice simple.`
   });
 }
