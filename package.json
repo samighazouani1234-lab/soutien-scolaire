@@ -18,3 +18,14 @@
     "typescript": "latest"
   }
 }
+<textarea
+  value={question}
+  onChange={(e) => setQuestion(e.target.value)}
+  placeholder="Pose ta question (math, physique...)"
+/>
+
+<button onClick={askAI}>
+  Générer réponse
+</button>
+
+<div>{answer}</div>
