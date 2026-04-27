@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { data } from "../data/courses";
 
 export default function Home() {
@@ -10,47 +10,45 @@ export default function Home() {
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const niveaux = matiere
-    ? Object.values(data[matiere]).flatMap((cat: any) => Object.keys(cat))
-    : [];
+  const niveaux = useMemo(() => {
+    if (!matiere) return [];
+    return Object.values(data[matiere]).flatMap((cat: any) =>
+      Object.keys(cat)
+    );
+  }, [matiere]);
 
-  let chapitres: string[] = [];
-
-  if (matiere && niveau) {
+  const chapitres = useMemo(() => {
+    if (!matiere || !niveau) return [];
     const categories = data[matiere];
-
+    let list: string[] = [];
     for (const cat in categories) {
-      if (categories[cat][niveau]) {
-        chapitres = categories[cat][niveau];
-      }
+      if (categories[cat][niveau]) list = categories[cat][niveau];
     }
-  }
+    return list;
+  }, [matiere, niveau]);
 
   async function generate() {
     if (!matiere || !niveau || !chapitre) {
       alert("Choisis matière, niveau et chapitre");
       return;
     }
-
     setLoading(true);
     setAnswer("");
 
     const question = `
 Cours complet de ${matiere}, niveau ${niveau}, chapitre ${chapitre}.
 Donne :
-1. Un cours détaillé
-2. Des définitions simples
-3. Des exemples corrigés
-4. Des exercices progressifs
-5. Les corrections détaillées
-6. Une évaluation finale avec barème sur 10
+1. Cours détaillé (clair)
+2. Définitions
+3. Exemples corrigés
+4. Exercices progressifs
+5. Corrections détaillées
+6. Évaluation finale + barème /10
 `;
 
     const res = await fetch("/api/ia", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question }),
     });
 
@@ -60,311 +58,300 @@ Donne :
   }
 
   return (
-    <main style={styles.page}>
-      <section style={styles.hero}>
-        <div style={styles.overlay}>
-          <nav style={styles.nav}>
-            <div style={styles.logo}>🤖 EduAI</div>
-
-            <div style={styles.navLinks}>
-              <a href="#accueil" style={styles.link}>Accueil</a>
-              <a href="#cours" style={styles.link}>Cours</a>
-              <a href="#ia" style={styles.link}>IA</a>
-              <a href="#ia" style={styles.ctaSmall}>Commencer</a>
-            </div>
+    <main style={s.page}>
+      {/* NAV */}
+      <header style={s.header}>
+        <div style={s.headerInner}>
+          <div style={s.logo}>🤖 EduAI</div>
+          <nav style={s.nav}>
+            <a href="#features" style={s.navLink}>Fonctionnalités</a>
+            <a href="#parcours" style={s.navLink}>Parcours</a>
+            <a href="#pricing" style={s.navLink}>Tarifs</a>
+            <a href="#faq" style={s.navLink}>FAQ</a>
+            <a href="#ia" style={s.ctaSmall}>Commencer</a>
           </nav>
+        </div>
+      </header>
 
-          <div id="accueil" style={styles.heroContent}>
-            <div style={styles.left}>
-              <span style={styles.badge}>
-                ✨ IA éducative nouvelle génération
-              </span>
+      {/* HERO */}
+      <section style={s.hero}>
+        <div style={s.heroGrid}>
+          <div style={s.heroLeft}>
+            <span style={s.badge}>✨ IA éducative nouvelle génération</span>
+            <h1 style={s.title}>
+              Apprends plus vite
+              <br />
+              avec une IA scolaire.
+            </h1>
+            <p style={s.subtitle}>
+              Cours clairs, exercices corrigés, évaluations intelligentes.
+              Du collège à la prépa.
+            </p>
 
-              <h1 style={styles.title}>
-                Apprends mieux, comprends tout.
-              </h1>
+            <div style={s.heroCards}>
+              <div style={s.card}>🎓 Collège → Prépa</div>
+              <div style={s.card}>✍️ Exercices auto</div>
+              <div style={s.card}>📈 Progression</div>
+            </div>
+          </div>
 
-              <p style={styles.subtitle}>
-                Des cours clairs, des exercices corrigés et une IA qui
-                t’accompagne du collège à la prépa.
-              </p>
+          {/* GENERATOR */}
+          <div id="ia" style={s.generator}>
+            <h2 style={s.genTitle}>🤖 Générateur IA</h2>
 
-              <div style={styles.cards}>
-                <div style={styles.miniCard}>🎓 Collège → Prépa</div>
-                <div style={styles.miniCard}>✍️ Exercices adaptés</div>
-                <div style={styles.miniCard}>📈 Suivi de progression</div>
+            <select
+              style={s.input}
+              value={matiere}
+              onChange={(e) => {
+                setMatiere(e.target.value);
+                setNiveau("");
+                setChapitre("");
+              }}
+            >
+              <option value="">Matière</option>
+              {Object.keys(data).map((m) => (
+                <option key={m}>{m}</option>
+              ))}
+            </select>
+
+            <select
+              style={s.input}
+              value={niveau}
+              onChange={(e) => {
+                setNiveau(e.target.value);
+                setChapitre("");
+              }}
+            >
+              <option value="">Niveau</option>
+              {niveaux.map((n) => (
+                <option key={n}>{n}</option>
+              ))}
+            </select>
+
+            <select
+              style={s.input}
+              value={chapitre}
+              onChange={(e) => setChapitre(e.target.value)}
+            >
+              <option value="">Chapitre</option>
+              {chapitres.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+
+            <button style={s.button} onClick={generate}>
+              {loading ? "⏳ Génération..." : "✨ Générer mon cours"}
+            </button>
+
+            {answer && (
+              <div style={s.result}>
+                <pre style={s.pre}>{answer}</pre>
               </div>
-            </div>
-
-            <div id="ia" style={styles.generator}>
-              <h2 style={styles.generatorTitle}>🤖 Générateur de cours IA</h2>
-
-              <label style={styles.label}>Matière</label>
-              <select
-                style={styles.input}
-                value={matiere}
-                onChange={(e) => {
-                  setMatiere(e.target.value);
-                  setNiveau("");
-                  setChapitre("");
-                }}
-              >
-                <option value="">Choisir une matière</option>
-                {Object.keys(data).map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-
-              <label style={styles.label}>Niveau</label>
-              <select
-                style={styles.input}
-                value={niveau}
-                onChange={(e) => {
-                  setNiveau(e.target.value);
-                  setChapitre("");
-                }}
-              >
-                <option value="">Choisir un niveau</option>
-                {niveaux.map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-
-              <label style={styles.label}>Chapitre</label>
-              <select
-                style={styles.input}
-                value={chapitre}
-                onChange={(e) => setChapitre(e.target.value)}
-              >
-                <option value="">Choisir un chapitre</option>
-                {chapitres.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-
-              <button onClick={generate} style={styles.button}>
-                {loading ? "⏳ Génération en cours..." : "✨ Générer mon cours"}
-              </button>
-
-              {answer && (
-                <div style={styles.result}>
-                  <h3 style={{ marginTop: 0 }}>📘 Cours généré</h3>
-                  <pre style={styles.pre}>{answer}</pre>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </div>
       </section>
 
-      <section id="cours" style={styles.stats}>
-        <div>😊 <b>50 000+</b><br />élèves accompagnés</div>
-        <div>⭐ <b>4.9/5</b><br />satisfaction moyenne</div>
-        <div>📚 <b>10 000+</b><br />cours disponibles</div>
-        <div>🚀 <b>100%</b><br />IA pédagogique</div>
+      {/* FEATURES */}
+      <section id="features" style={s.section}>
+        <h2 style={s.sectionTitle}>Pourquoi choisir EduAI ?</h2>
+        <div style={s.grid3}>
+          <div style={s.feature}>
+            ⚡ Génération instantanée
+            <p>Un cours complet en quelques secondes</p>
+          </div>
+          <div style={s.feature}>
+            🧠 Adaptatif
+            <p>Contenu adapté à ton niveau réel</p>
+          </div>
+          <div style={s.feature}>
+            📊 Progression
+            <p>Suivi et amélioration continue</p>
+          </div>
+        </div>
       </section>
+
+      {/* PARCOURS */}
+      <section id="parcours" style={s.sectionAlt}>
+        <h2 style={s.sectionTitle}>Tous les niveaux</h2>
+        <div style={s.grid4}>
+          <div style={s.level}>Collège</div>
+          <div style={s.level}>Lycée</div>
+          <div style={s.level}>Prépa</div>
+          <div style={s.level}>Grandes écoles</div>
+        </div>
+      </section>
+
+      {/* TESTIMONIAL */}
+      <section style={s.section}>
+        <h2 style={s.sectionTitle}>Ils progressent avec nous</h2>
+        <div style={s.grid3}>
+          <div style={s.testimonial}>“J’ai gagné 4 points en maths !”</div>
+          <div style={s.testimonial}>“Meilleur que mes cours”</div>
+          <div style={s.testimonial}>“Incroyable pour la prépa”</div>
+        </div>
+      </section>
+
+      {/* PRICING */}
+      <section id="pricing" style={s.sectionAlt}>
+        <h2 style={s.sectionTitle}>Tarifs</h2>
+        <div style={s.grid3}>
+          <div style={s.priceCard}>
+            Gratuit
+            <p>Accès limité</p>
+          </div>
+          <div style={s.priceCardMain}>
+            Pro
+            <p>IA illimitée</p>
+          </div>
+          <div style={s.priceCard}>
+            Premium
+            <p>Coaching + IA</p>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" style={s.section}>
+        <h2 style={s.sectionTitle}>FAQ</h2>
+        <div style={s.faq}>Est-ce vraiment utile ? → Oui</div>
+        <div style={s.faq}>Est-ce difficile ? → Non</div>
+        <div style={s.faq}>Remplace un prof ? → Non, complète</div>
+      </section>
+
+      {/* FOOTER */}
+      <footer style={s.footer}>
+        © 2026 EduAI — Tous droits réservés
+      </footer>
     </main>
   );
 }
 
-const styles: any = {
-  page: {
-    margin: 0,
-    fontFamily: "Inter, Arial, sans-serif",
-    background: "#f8fafc",
-    color: "#0f172a",
+const s: any = {
+  page: { fontFamily: "Inter, Arial", margin: 0 },
+
+  header: {
+    position: "fixed",
+    width: "100%",
+    backdropFilter: "blur(10px)",
+    background: "rgba(255,255,255,0.7)",
+    zIndex: 10,
+  },
+  headerInner: {
+    maxWidth: 1200,
+    margin: "0 auto",
+    display: "flex",
+    justifyContent: "space-between",
+    padding: 16,
+  },
+  logo: { fontWeight: 900 },
+  nav: { display: "flex", gap: 20, alignItems: "center" },
+  navLink: { textDecoration: "none", color: "#333" },
+  ctaSmall: {
+    background: "#7c3aed",
+    color: "white",
+    padding: "8px 14px",
+    borderRadius: 10,
   },
 
   hero: {
     minHeight: "100vh",
     backgroundImage: `
-      linear-gradient(
-        90deg,
-        rgba(255,255,255,0.96) 0%,
-        rgba(255,255,255,0.82) 42%,
-        rgba(255,255,255,0.25) 100%
-      ),
+      linear-gradient(rgba(255,255,255,0.9), rgba(255,255,255,0.6)),
       url('/hero.png')
     `,
     backgroundSize: "cover",
-    backgroundPosition: "center",
-    backgroundRepeat: "no-repeat",
+    paddingTop: 100,
   },
-
-  overlay: {
-    minHeight: "100vh",
-    padding: 24,
-  },
-
-  nav: {
-    maxWidth: 1280,
-    margin: "0 auto",
-    padding: "18px 24px",
-    borderRadius: 22,
-    background: "rgba(255,255,255,0.88)",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    boxShadow: "0 20px 60px rgba(15,23,42,0.12)",
-    backdropFilter: "blur(18px)",
-  },
-
-  logo: {
-    fontSize: 26,
-    fontWeight: 900,
-  },
-
-  navLinks: {
-    display: "flex",
-    gap: 24,
-    alignItems: "center",
-    flexWrap: "wrap",
-  },
-
-  link: {
-    fontWeight: 700,
-    color: "#334155",
-    textDecoration: "none",
-  },
-
-  ctaSmall: {
-    background: "#7c3aed",
-    color: "white",
-    padding: "12px 18px",
-    borderRadius: 14,
-    fontWeight: 900,
-    textDecoration: "none",
-  },
-
-  heroContent: {
-    maxWidth: 1280,
-    margin: "80px auto 0",
+  heroGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+    gridTemplateColumns: "1fr 400px",
     gap: 40,
-    alignItems: "center",
+    maxWidth: 1200,
+    margin: "0 auto",
   },
 
-  left: {
-    maxWidth: 650,
-  },
+  heroLeft: {},
+  badge: { background: "#eee", padding: 10, borderRadius: 20 },
+  title: { fontSize: 60, margin: "20px 0" },
+  subtitle: { fontSize: 20, color: "#555" },
 
-  badge: {
-    background: "#ede9fe",
-    color: "#6d28d9",
-    padding: "10px 16px",
-    borderRadius: 999,
-    fontWeight: 900,
-    display: "inline-block",
-  },
-
-  title: {
-    fontSize: "clamp(46px, 8vw, 82px)",
-    lineHeight: 1,
-    letterSpacing: -3,
-    margin: "28px 0",
-  },
-
-  subtitle: {
-    fontSize: 22,
-    lineHeight: 1.6,
-    color: "#475569",
-    maxWidth: 620,
-  },
-
-  cards: {
-    display: "flex",
-    gap: 16,
-    flexWrap: "wrap",
-    marginTop: 34,
-  },
-
-  miniCard: {
-    background: "rgba(255,255,255,0.85)",
-    padding: 18,
-    borderRadius: 18,
-    fontWeight: 800,
-    boxShadow: "0 10px 30px rgba(15,23,42,0.08)",
-  },
+  heroCards: { display: "flex", gap: 10 },
+  card: { background: "#fff", padding: 10, borderRadius: 10 },
 
   generator: {
-    background: "rgba(255,255,255,0.92)",
-    backdropFilter: "blur(20px)",
-    padding: 28,
-    borderRadius: 30,
-    boxShadow: "0 30px 90px rgba(15,23,42,0.18)",
-    border: "1px solid rgba(255,255,255,0.7)",
+    background: "white",
+    padding: 20,
+    borderRadius: 20,
+    boxShadow: "0 20px 50px rgba(0,0,0,0.1)",
   },
-
-  generatorTitle: {
-    marginTop: 0,
-    marginBottom: 18,
-    fontSize: 28,
-  },
-
-  label: {
-    display: "block",
-    marginTop: 14,
-    marginBottom: 6,
-    fontWeight: 800,
-    color: "#475569",
-    fontSize: 14,
-  },
+  genTitle: { marginTop: 0 },
 
   input: {
     width: "100%",
-    padding: 16,
-    borderRadius: 16,
-    border: "1px solid #e2e8f0",
-    fontSize: 16,
-    boxSizing: "border-box",
-    background: "white",
-    color: "#0f172a",
+    padding: 12,
+    marginTop: 10,
+    borderRadius: 10,
+    border: "1px solid #ddd",
   },
 
   button: {
     width: "100%",
-    marginTop: 22,
-    padding: 17,
-    borderRadius: 18,
-    border: 0,
-    background: "linear-gradient(90deg,#7c3aed,#6366f1)",
+    marginTop: 15,
+    padding: 12,
+    background: "#7c3aed",
     color: "white",
-    fontWeight: 900,
-    fontSize: 16,
-    cursor: "pointer",
+    border: "none",
+    borderRadius: 10,
   },
 
   result: {
-    marginTop: 22,
-    background: "#0f172a",
+    marginTop: 10,
+    background: "#111",
     color: "white",
-    padding: 18,
-    borderRadius: 20,
-    maxHeight: 360,
+    padding: 10,
+    borderRadius: 10,
+    maxHeight: 200,
     overflow: "auto",
-    fontSize: 14,
   },
 
-  pre: {
-    whiteSpace: "pre-wrap",
-    margin: 0,
-    fontFamily: "Inter, Arial, sans-serif",
-    lineHeight: 1.7,
-  },
+  pre: { whiteSpace: "pre-wrap" },
 
-  stats: {
-    maxWidth: 1100,
-    margin: "-70px auto 60px",
-    background: "rgba(255,255,255,0.95)",
-    borderRadius: 28,
-    padding: 28,
+  section: { padding: 60, textAlign: "center" },
+  sectionAlt: { padding: 60, background: "#f1f5f9", textAlign: "center" },
+
+  sectionTitle: { fontSize: 32 },
+
+  grid3: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: 24,
+    gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))",
+    gap: 20,
+    marginTop: 30,
+  },
+  grid4: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
+    gap: 20,
+    marginTop: 30,
+  },
+
+  feature: { background: "white", padding: 20, borderRadius: 10 },
+  level: { background: "white", padding: 20, borderRadius: 10 },
+  testimonial: { background: "white", padding: 20 },
+
+  priceCard: { background: "white", padding: 20 },
+  priceCardMain: {
+    background: "#7c3aed",
+    color: "white",
+    padding: 20,
+  },
+
+  faq: { marginTop: 10 },
+
+  footer: {
+    padding: 20,
     textAlign: "center",
-    boxShadow: "0 30px 90px rgba(15,23,42,0.12)",
-    position: "relative",
-    zIndex: 3,
+    background: "#111",
+    color: "white",
   },
 };
