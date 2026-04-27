@@ -1,91 +1,55 @@
+// data/courses.ts
+
 export const data = {
   Mathématiques: {
     College: {
-      "6e": ["Fractions", "Nombres décimaux", "Proportionnalité", "Géométrie"],
-      "5e": ["Fractions avancées", "Pourcentages", "Volumes", "Symétrie"],
-      "4e": ["Pythagore", "Puissances", "Equations", "Statistiques"],
-      "3e": ["Fonctions", "Trigonométrie", "Probabilités", "Suites simples"],
+      "6e": ["Fractions", "Nombres décimaux"],
+      "5e": ["Pourcentages", "Géométrie"],
+      "4e": ["Pythagore", "Equations"],
+      "3e": ["Fonctions", "Trigonométrie"],
     },
-
     Lycee: {
-      "2nde": ["Fonctions", "Vecteurs", "Probabilités", "Statistiques"],
-      "1ere": ["Dérivation", "Suites", "Exponentielle", "Trigonométrie"],
-      "Terminale": ["Limites", "Intégrales", "Suites avancées", "Probabilités"],
+      "2nde": ["Fonctions", "Vecteurs"],
+      "1ere": ["Dérivation", "Suites"],
+      "Terminale": ["Limites", "Intégrales"],
     },
-
     Prepa: {
-      MPSI: [
-        "Algèbre linéaire",
-        "Suites et séries",
-        "Analyse réelle",
-        "Fonctions de plusieurs variables"
-      ],
-      PCSI: [
-        "Espaces vectoriels",
-        "Séries",
-        "Calcul différentiel",
-        "Analyse complexe"
-      ],
+      MPSI: ["Algèbre", "Analyse"],
+      PCSI: ["Calcul différentiel", "Séries"],
     },
-
-    GrandesEcoles: {
-      HEC: [
-        "Probabilités avancées",
-        "Statistiques",
-        "Optimisation",
-        "Analyse de données"
-      ],
-      "Ingénieur": [
-        "Algèbre avancée",
-        "Analyse numérique",
-        "Calcul scientifique"
-      ]
-    }
   },
 
   Physique: {
     College: {
-      "6e": ["Matière", "Energie"],
-      "5e": ["Forces", "Mouvement"],
-      "4e": ["Electricité", "Vitesse"],
-      "3e": ["Ondes", "Optique"]
+      "6e": ["Matière"],
+      "5e": ["Forces"],
+      "4e": ["Electricité"],
+      "3e": ["Ondes"],
     },
-
     Lycee: {
-      "2nde": ["Mouvement", "Forces", "Energie"],
-      "1ere": ["Ondes", "Electricité"],
-      "Terminale": ["Mécanique", "Optique", "Thermodynamique"]
+      "2nde": ["Mouvement"],
+      "1ere": ["Electricité"],
+      "Terminale": ["Mécanique"],
     },
-
     Prepa: {
-      MPSI: ["Mécanique du point", "Thermodynamique", "Ondes"],
-      PCSI: ["Mécanique avancée", "Electromagnétisme", "Chimie physique"]
+      MPSI: ["Mécanique", "Ondes"],
+      PCSI: ["Thermodynamique"],
     },
-
-    GrandesEcoles: {
-      "Ingénieur": ["Mécanique avancée", "Physique quantique", "Optique avancée"]
-    }
   },
 
   Chimie: {
     College: {
-      "5e": ["Mélanges", "Transformations chimiques"],
-      "4e": ["Réactions chimiques"],
-      "3e": ["Acides et bases"]
+      "5e": ["Mélanges"],
+      "4e": ["Réactions"],
+      "3e": ["Acides bases"],
     },
-
     Lycee: {
-      "2nde": ["Structure de la matière"],
-      "1ere": ["Réactions chimiques", "Energie"],
-      "Terminale": ["Cinétique chimique", "Equilibres"]
+      "2nde": ["Structure"],
+      "1ere": ["Réactions"],
+      "Terminale": ["Equilibres"],
     },
-
     Prepa: {
-      PCSI: ["Thermodynamique chimique", "Cinétique", "Equilibres"]
+      PCSI: ["Chimie avancée"],
     },
-
-    GrandesEcoles: {
-      "Ingénieur": ["Chimie organique", "Chimie industrielle"]
-    }
-  }
+  },
 };
