@@ -1,21 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { data } from "../data/courses";
 import { getSupabaseClient } from "../lib/supabase";
 
 export default function Home() {
-  const supabase = getSupabaseClient();
-
   const [user, setUser] = useState<any>(null);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const [matiere, setMatiere] = useState("");
   const [niveau, setNiveau] = useState("");
   const [chapitre, setChapitre] = useState("");
-  const [contenu, setContenu] = useState("");
+  const [answer, setAnswer] = useState("");
+
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    const supabase = getSupabaseClient();
     if (!supabase) return;
 
     supabase.auth.getUser().then(({ data }) => {
@@ -33,11 +36,49 @@ export default function Home() {
     };
   }, []);
 
-  async function signUp() {
-    if (!supabase) return alert("Supabase non connecté");
+  const niveaux = useMemo(() => {
+    if (!matiere) return [];
 
-    if (!email || !password) {
+    const selected = (data as any)[matiere];
+    if (!selected) return [];
+
+    return Object.values(selected).flatMap((categorie: any) =>
+      Object.keys(categorie)
+    );
+  }, [matiere]);
+
+  const chapitres = useMemo(() => {
+    if (!matiere || !niveau) return [];
+
+    const selected = (data as any)[matiere];
+    if (!selected) return [];
+
+    for (const categorie in selected) {
+      if (selected[categorie][niveau]) {
+        return selected[categorie][niveau];
+      }
+    }
+
+    return [];
+  }, [matiere, niveau]);
+
+  async function handleSignup() {
+    const supabase = getSupabaseClient();
+
+    if (!supabase) {
+      alert("Erreur Supabase");
+      return;
+    }
+
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail || !password) {
       alert("Entre un email et un mot de passe");
+      return;
+    }
+
+    if (!cleanEmail.includes("@")) {
+      alert("Email invalide");
       return;
     }
 
@@ -46,68 +87,116 @@ export default function Home() {
       return;
     }
 
+    setLoading(true);
+
     const { error } = await supabase.auth.signUp({
-      email: email.trim(),
+      email: cleanEmail,
       password,
     });
 
-    if (error) alert(error.message);
-    else alert("Compte créé !");
+    setLoading(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert("Compte créé. Tu peux maintenant te connecter.");
   }
 
-  async function signIn() {
-    if (!supabase) return alert("Supabase non connecté");
+  async function handleLogin() {
+    const supabase = getSupabaseClient();
 
-    if (!email || !password) {
+    if (!supabase) {
+      alert("Erreur Supabase");
+      return;
+    }
+
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail || !password) {
       alert("Entre un email et un mot de passe");
       return;
     }
 
+    setLoading(true);
+
     const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+      email: cleanEmail,
       password,
     });
 
-    if (error) alert(error.message);
-    else alert("Connexion réussie !");
+    setLoading(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert("Connexion réussie");
   }
 
-  async function signOut() {
+  async function handleLogout() {
+    const supabase = getSupabaseClient();
     if (!supabase) return;
 
     await supabase.auth.signOut();
     setUser(null);
+    setAnswer("");
   }
 
-  async function saveCourse() {
-    if (!supabase) return alert("Supabase non connecté");
+  async function generateCourse() {
+    const supabase = getSupabaseClient();
 
-    if (!user) {
-      alert("Connecte-toi d’abord");
+    if (!matiere || !niveau || !chapitre) {
+      alert("Choisis une matière, un niveau et un chapitre");
       return;
     }
 
-    if (!contenu) {
-      alert("Écris un cours avant de sauvegarder");
-      return;
+    setLoading(true);
+    setAnswer("");
+
+    try {
+      const question = `
+Cours complet de ${matiere}, niveau ${niveau}, chapitre ${chapitre}.
+Donne :
+1. Un cours détaillé
+2. Des définitions simples
+3. Des exemples corrigés
+4. Des exercices progressifs
+5. Les corrections détaillées
+6. Une évaluation finale avec barème sur 10
+`;
+
+      const res = await fetch("/api/ia", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ question }),
+      });
+
+      const json = await res.json();
+      const content = json.answer || "Erreur IA";
+
+      setAnswer(content);
+
+      if (supabase && user) {
+        await supabase.from("courses").insert([
+          {
+            user_id: user.id,
+            matiere,
+            niveau,
+            chapitre,
+            contenu: content,
+          },
+        ]);
+      }
+    } catch (error) {
+      setAnswer("Erreur pendant la génération du cours.");
     }
 
-    const { error } = await supabase.from("courses").insert([
-      {
-        user_id: user.id,
-        matiere: matiere || "Non précisé",
-        niveau: niveau || "Non précisé",
-        chapitre: chapitre || "Non précisé",
-        contenu,
-      },
-    ]);
-
-    if (error) {
-      alert(error.message);
-    } else {
-      alert("Cours sauvegardé !");
-      setContenu("");
-    }
+    setLoading(false);
   }
 
   return (
@@ -116,16 +205,30 @@ export default function Home() {
         <nav style={styles.nav}>
           <div style={styles.logo}>🤖 EduAI</div>
 
-          {user ? (
-            <button onClick={signOut} style={styles.navButton}>
-              Déconnexion
-            </button>
-          ) : (
-            <span style={styles.cta}>Connexion</span>
-          )}
+          <div style={styles.navLinks}>
+            <a href="#generate" style={styles.link}>
+              Générateur
+            </a>
+            <a href="#features" style={styles.link}>
+              Avantages
+            </a>
+            <a href="#pricing" style={styles.link}>
+              Tarifs
+            </a>
+
+            {user ? (
+              <button onClick={handleLogout} style={styles.navButton}>
+                Déconnexion
+              </button>
+            ) : (
+              <a href="#login" style={styles.cta}>
+                Connexion
+              </a>
+            )}
+          </div>
         </nav>
 
-        <div style={styles.content}>
+        <div style={styles.heroContent}>
           <div style={styles.left}>
             <span style={styles.badge}>✨ IA éducative premium</span>
 
@@ -134,7 +237,8 @@ export default function Home() {
             </h1>
 
             <p style={styles.subtitle}>
-              Génère, écris et sauvegarde tes cours directement dans ton espace.
+              Génère des cours détaillés, exercices corrigés et évaluations du
+              collège à la prépa.
             </p>
 
             <div style={styles.cards}>
@@ -144,13 +248,14 @@ export default function Home() {
             </div>
           </div>
 
-          <div style={styles.panel}>
+          <div id="login" style={styles.panel}>
             {!user ? (
               <>
                 <h2 style={styles.panelTitle}>🔐 Connexion</h2>
 
                 <input
                   style={styles.input}
+                  type="email"
                   placeholder="Email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -165,54 +270,111 @@ export default function Home() {
                 />
 
                 <div style={styles.buttonRow}>
-                  <button onClick={signIn} style={styles.loginBtn}>
-                    Se connecter
+                  <button onClick={handleLogin} style={styles.loginBtn}>
+                    {loading ? "..." : "Se connecter"}
                   </button>
 
-                  <button onClick={signUp} style={styles.signupBtn}>
-                    Créer un compte
+                  <button onClick={handleSignup} style={styles.signupBtn}>
+                    {loading ? "..." : "Créer un compte"}
                   </button>
                 </div>
               </>
             ) : (
-              <>
+              <div id="generate">
                 <p style={styles.connected}>✅ Connecté : {user.email}</p>
 
-                <h2 style={styles.panelTitle}>📚 Sauvegarder un cours</h2>
+                <h2 style={styles.panelTitle}>🤖 Générateur de cours</h2>
 
-                <input
+                <select
                   style={styles.input}
-                  placeholder="Matière"
                   value={matiere}
-                  onChange={(e) => setMatiere(e.target.value)}
-                />
+                  onChange={(e) => {
+                    setMatiere(e.target.value);
+                    setNiveau("");
+                    setChapitre("");
+                  }}
+                >
+                  <option value="">Choisir une matière</option>
+                  {Object.keys(data).map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
 
-                <input
+                <select
                   style={styles.input}
-                  placeholder="Niveau"
                   value={niveau}
-                  onChange={(e) => setNiveau(e.target.value)}
-                />
+                  onChange={(e) => {
+                    setNiveau(e.target.value);
+                    setChapitre("");
+                  }}
+                >
+                  <option value="">Choisir un niveau</option>
+                  {niveaux.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
 
-                <input
+                <select
                   style={styles.input}
-                  placeholder="Chapitre"
                   value={chapitre}
                   onChange={(e) => setChapitre(e.target.value)}
-                />
+                >
+                  <option value="">Choisir un chapitre</option>
+                  {chapitres.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
 
-                <textarea
-                  style={styles.textarea}
-                  placeholder="Écris ton cours ici..."
-                  value={contenu}
-                  onChange={(e) => setContenu(e.target.value)}
-                />
-
-                <button onClick={saveCourse} style={styles.saveBtn}>
-                  💾 Sauvegarder dans Supabase
+                <button onClick={generateCourse} style={styles.generateBtn}>
+                  {loading ? "Génération..." : "✨ Générer mon cours"}
                 </button>
-              </>
+
+                {answer && (
+                  <div style={styles.result}>
+                    <h3>📘 Cours généré</h3>
+                    <pre style={styles.pre}>{answer}</pre>
+                  </div>
+                )}
+              </div>
             )}
+          </div>
+        </div>
+      </section>
+
+      <section id="features" style={styles.features}>
+        <h2 style={styles.sectionTitle}>Pourquoi EduAI ?</h2>
+
+        <div style={styles.grid}>
+          <div style={styles.featureCard}>⚡ Cours générés rapidement</div>
+          <div style={styles.featureCard}>🧠 Explications adaptées</div>
+          <div style={styles.featureCard}>✍️ Exercices automatiques</div>
+          <div style={styles.featureCard}>📊 Évaluation finale</div>
+        </div>
+      </section>
+
+      <section id="pricing" style={styles.pricing}>
+        <h2 style={styles.sectionTitle}>Formules</h2>
+
+        <div style={styles.grid}>
+          <div style={styles.priceCard}>
+            <h3>Découverte</h3>
+            <p>Gratuit</p>
+          </div>
+
+          <div style={styles.priceCardPro}>
+            <h3>Pro</h3>
+            <p>IA illimitée</p>
+          </div>
+
+          <div style={styles.priceCard}>
+            <h3>Premium</h3>
+            <p>IA + visio prof</p>
           </div>
         </div>
       </section>
@@ -241,6 +403,7 @@ const styles: any = {
     `,
     backgroundSize: "cover",
     backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
     padding: 28,
   },
 
@@ -255,11 +418,25 @@ const styles: any = {
     justifyContent: "space-between",
     alignItems: "center",
     border: "1px solid rgba(255,255,255,0.2)",
+    boxShadow: "0 20px 70px rgba(0,0,0,0.25)",
   },
 
   logo: {
     fontSize: 30,
     fontWeight: 900,
+  },
+
+  navLinks: {
+    display: "flex",
+    gap: 20,
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+
+  link: {
+    color: "#e0f2fe",
+    fontWeight: 800,
+    textDecoration: "none",
   },
 
   cta: {
@@ -268,6 +445,7 @@ const styles: any = {
     padding: "12px 18px",
     borderRadius: 16,
     fontWeight: 900,
+    textDecoration: "none",
   },
 
   navButton: {
@@ -280,7 +458,7 @@ const styles: any = {
     cursor: "pointer",
   },
 
-  content: {
+  heroContent: {
     maxWidth: 1280,
     margin: "90px auto 0",
     display: "grid",
@@ -329,6 +507,7 @@ const styles: any = {
     borderRadius: 22,
     fontWeight: 900,
     border: "1px solid rgba(255,255,255,0.22)",
+    backdropFilter: "blur(14px)",
   },
 
   panel: {
@@ -337,6 +516,7 @@ const styles: any = {
     padding: 36,
     borderRadius: 36,
     boxShadow: "0 35px 100px rgba(0,0,0,0.3)",
+    border: "1px solid rgba(255,255,255,0.7)",
   },
 
   panelTitle: {
@@ -347,17 +527,6 @@ const styles: any = {
 
   input: {
     width: "100%",
-    padding: 18,
-    marginTop: 14,
-    borderRadius: 20,
-    border: "1px solid #cbd5e1",
-    fontSize: 16,
-    boxSizing: "border-box",
-  },
-
-  textarea: {
-    width: "100%",
-    minHeight: 160,
     padding: 18,
     marginTop: 14,
     borderRadius: 20,
@@ -394,7 +563,7 @@ const styles: any = {
     cursor: "pointer",
   },
 
-  saveBtn: {
+  generateBtn: {
     width: "100%",
     marginTop: 22,
     padding: 18,
@@ -412,5 +581,69 @@ const styles: any = {
     padding: 12,
     borderRadius: 14,
     fontWeight: 800,
+  },
+
+  result: {
+    marginTop: 24,
+    background: "#0f172a",
+    color: "white",
+    padding: 20,
+    borderRadius: 22,
+    maxHeight: 360,
+    overflow: "auto",
+  },
+
+  pre: {
+    whiteSpace: "pre-wrap",
+    lineHeight: 1.7,
+    fontFamily: "Arial, sans-serif",
+  },
+
+  features: {
+    padding: "80px 24px",
+    background: "linear-gradient(180deg,#0f172a,#1e293b)",
+  },
+
+  pricing: {
+    padding: "80px 24px",
+    background: "#f8fafc",
+    color: "#0f172a",
+  },
+
+  sectionTitle: {
+    textAlign: "center",
+    fontSize: "clamp(34px,5vw,54px)",
+    marginBottom: 40,
+  },
+
+  grid: {
+    maxWidth: 1100,
+    margin: "0 auto",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: 20,
+  },
+
+  featureCard: {
+    background: "rgba(255,255,255,0.09)",
+    padding: 26,
+    borderRadius: 26,
+    fontWeight: 900,
+    border: "1px solid rgba(255,255,255,0.14)",
+  },
+
+  priceCard: {
+    background: "white",
+    padding: 28,
+    borderRadius: 28,
+    boxShadow: "0 20px 60px rgba(15,23,42,0.08)",
+  },
+
+  priceCardPro: {
+    background: "linear-gradient(135deg,#7c3aed,#2563eb)",
+    color: "white",
+    padding: 28,
+    borderRadius: 28,
+    boxShadow: "0 24px 80px rgba(37,99,235,0.25)",
   },
 };
