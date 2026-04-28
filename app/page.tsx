@@ -1,24 +1,45 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { data } from "../data/courses";
 import { supabase } from "../lib/supabase";
 
 export default function Home() {
+  const [user, setUser] = useState<any>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
   const [matiere, setMatiere] = useState("");
   const [niveau, setNiveau] = useState("");
   const [chapitre, setChapitre] = useState("");
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
   const niveaux = useMemo(() => {
     if (!matiere) return [];
-    return Object.values(data[matiere]).flatMap((cat: any) => Object.keys(cat));
+    return Object.values((data as any)[matiere]).flatMap((cat: any) =>
+      Object.keys(cat)
+    );
   }, [matiere]);
 
   const chapitres = useMemo(() => {
     if (!matiere || !niveau) return [];
-    const categories = data[matiere];
+
+    const categories = (data as any)[matiere];
 
     for (const cat in categories) {
       if (categories[cat][niveau]) return categories[cat][niveau];
@@ -27,7 +48,47 @@ export default function Home() {
     return [];
   }, [matiere, niveau]);
 
+  async function signUp() {
+    if (!email || !password) {
+      alert("Entre ton email et ton mot de passe");
+      return;
+    }
+
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error) alert(error.message);
+    else alert("Compte créé. Vérifie ton email si demandé.");
+  }
+
+  async function signIn() {
+    if (!email || !password) {
+      alert("Entre ton email et ton mot de passe");
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) alert(error.message);
+    else alert("Connecté !");
+  }
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    setUser(null);
+  }
+
   async function generate() {
+    if (!user) {
+      alert("Connecte-toi pour générer et sauvegarder un cours");
+      return;
+    }
+
     if (!matiere || !niveau || !chapitre) {
       alert("Choisis matière, niveau et chapitre");
       return;
@@ -39,12 +100,12 @@ export default function Home() {
     const question = `
 Cours complet de ${matiere}, niveau ${niveau}, chapitre ${chapitre}.
 Donne :
-1. Cours détaillé
-2. Définitions simples
-3. Exemples corrigés
-4. Exercices progressifs
-5. Corrections détaillées
-6. Évaluation finale avec barème sur 10
+1. Un cours détaillé
+2. Des définitions simples
+3. Des exemples corrigés
+4. Des exercices progressifs
+5. Les corrections détaillées
+6. Une évaluation finale avec barème sur 10
 `;
 
     const res = await fetch("/api/ia", {
@@ -62,7 +123,7 @@ Donne :
 
     await supabase.from("courses").insert([
       {
-        user_id: "demo",
+        user_id: user.id,
         matiere,
         niveau,
         chapitre,
@@ -83,7 +144,14 @@ Donne :
             <a href="#ia" style={styles.link}>Générateur</a>
             <a href="#features" style={styles.link}>Avantages</a>
             <a href="#pricing" style={styles.link}>Tarifs</a>
-            <a href="#ia" style={styles.ctaSmall}>Commencer</a>
+
+            {user ? (
+              <button onClick={signOut} style={styles.logout}>
+                Déconnexion
+              </button>
+            ) : (
+              <a href="#login" style={styles.ctaSmall}>Connexion</a>
+            )}
           </div>
         </nav>
 
@@ -107,60 +175,96 @@ Donne :
           </div>
 
           <div id="ia" style={styles.generator}>
-            <h2 style={styles.generatorTitle}>🤖 Générateur de cours</h2>
-            <p style={styles.generatorText}>
-              Choisis une matière, un niveau et un chapitre.
-            </p>
+            {!user && (
+              <div id="login" style={styles.loginBox}>
+                <h2 style={styles.generatorTitle}>🔐 Connexion</h2>
 
-            <select
-              style={styles.input}
-              value={matiere}
-              onChange={(e) => {
-                setMatiere(e.target.value);
-                setNiveau("");
-                setChapitre("");
-              }}
-            >
-              <option value="">Choisir une matière</option>
-              {Object.keys(data).map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
+                <input
+                  style={styles.input}
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
 
-            <select
-              style={styles.input}
-              value={niveau}
-              onChange={(e) => {
-                setNiveau(e.target.value);
-                setChapitre("");
-              }}
-            >
-              <option value="">Choisir un niveau</option>
-              {niveaux.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
+                <input
+                  style={styles.input}
+                  type="password"
+                  placeholder="Mot de passe"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
 
-            <select
-              style={styles.input}
-              value={chapitre}
-              onChange={(e) => setChapitre(e.target.value)}
-            >
-              <option value="">Choisir un chapitre</option>
-              {chapitres.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-
-            <button onClick={generate} style={styles.button}>
-              {loading ? "⏳ Génération en cours..." : "✨ Générer mon cours"}
-            </button>
-
-            {answer && (
-              <div style={styles.result}>
-                <h3 style={{ marginTop: 0 }}>📘 Cours généré</h3>
-                <pre style={styles.pre}>{answer}</pre>
+                <div style={styles.authButtons}>
+                  <button onClick={signIn} style={styles.buttonSmall}>
+                    Se connecter
+                  </button>
+                  <button onClick={signUp} style={styles.buttonSmallAlt}>
+                    Créer un compte
+                  </button>
+                </div>
               </div>
+            )}
+
+            {user && (
+              <>
+                <p style={styles.connected}>✅ Connecté : {user.email}</p>
+
+                <h2 style={styles.generatorTitle}>🤖 Générateur de cours</h2>
+                <p style={styles.generatorText}>
+                  Choisis une matière, un niveau et un chapitre.
+                </p>
+
+                <select
+                  style={styles.input}
+                  value={matiere}
+                  onChange={(e) => {
+                    setMatiere(e.target.value);
+                    setNiveau("");
+                    setChapitre("");
+                  }}
+                >
+                  <option value="">Choisir une matière</option>
+                  {Object.keys(data).map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+
+                <select
+                  style={styles.input}
+                  value={niveau}
+                  onChange={(e) => {
+                    setNiveau(e.target.value);
+                    setChapitre("");
+                  }}
+                >
+                  <option value="">Choisir un niveau</option>
+                  {niveaux.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+
+                <select
+                  style={styles.input}
+                  value={chapitre}
+                  onChange={(e) => setChapitre(e.target.value)}
+                >
+                  <option value="">Choisir un chapitre</option>
+                  {chapitres.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+
+                <button onClick={generate} style={styles.button}>
+                  {loading ? "⏳ Génération en cours..." : "✨ Générer mon cours"}
+                </button>
+
+                {answer && (
+                  <div style={styles.result}>
+                    <h3 style={{ marginTop: 0 }}>📘 Cours généré</h3>
+                    <pre style={styles.pre}>{answer}</pre>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -265,6 +369,16 @@ const styles: any = {
     textDecoration: "none",
   },
 
+  logout: {
+    background: "rgba(255,255,255,0.18)",
+    color: "white",
+    padding: "12px 18px",
+    borderRadius: 16,
+    border: "1px solid rgba(255,255,255,0.25)",
+    cursor: "pointer",
+    fontWeight: 900,
+  },
+
   heroContent: {
     maxWidth: 1280,
     margin: "80px auto 0",
@@ -332,6 +446,10 @@ const styles: any = {
     border: "1px solid rgba(255,255,255,0.65)",
   },
 
+  loginBox: {
+    marginBottom: 20,
+  },
+
   generatorTitle: {
     marginTop: 0,
     marginBottom: 8,
@@ -341,6 +459,14 @@ const styles: any = {
   generatorText: {
     color: "#64748b",
     marginBottom: 18,
+  },
+
+  connected: {
+    background: "#dcfce7",
+    color: "#166534",
+    padding: 12,
+    borderRadius: 14,
+    fontWeight: 800,
   },
 
   input: {
@@ -353,6 +479,35 @@ const styles: any = {
     boxSizing: "border-box",
     background: "white",
     color: "#0f172a",
+  },
+
+  authButtons: {
+    display: "flex",
+    gap: 12,
+    marginTop: 18,
+    flexWrap: "wrap",
+  },
+
+  buttonSmall: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 16,
+    border: 0,
+    background: "#2563eb",
+    color: "white",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
+  buttonSmallAlt: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 16,
+    border: 0,
+    background: "#7c3aed",
+    color: "white",
+    fontWeight: 900,
+    cursor: "pointer",
   },
 
   button: {
