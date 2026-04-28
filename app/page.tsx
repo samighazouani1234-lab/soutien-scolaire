@@ -1,91 +1,342 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { data } from "../data/courses";
 import { getSupabaseClient } from "../lib/supabase";
 
 export default function Home() {
   const supabase = getSupabaseClient();
 
+  const [user, setUser] = useState<any>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const [matiere, setMatiere] = useState("");
+  const [niveau, setNiveau] = useState("");
+  const [chapitre, setChapitre] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user || null);
+      }
+    );
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  const niveaux = useMemo(() => {
+    if (!matiere) return [];
+    return Object.values((data as any)[matiere]).flatMap((cat: any) =>
+      Object.keys(cat)
+    );
+  }, [matiere]);
+
+  const chapitres = useMemo(() => {
+    if (!matiere || !niveau) return [];
+    const categories = (data as any)[matiere];
+
+    for (const cat in categories) {
+      if (categories[cat][niveau]) return categories[cat][niveau];
+    }
+
+    return [];
+  }, [matiere, niveau]);
+
   async function handleSignup() {
-    if (!email || !password) {
+    if (!supabase) {
+      alert("Erreur Supabase : connexion impossible");
+      return;
+    }
+
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail || !password) {
       alert("Entre un email et un mot de passe");
+      return;
+    }
+
+    if (!cleanEmail.includes("@")) {
+      alert("Email invalide");
       return;
     }
 
     if (password.length < 6) {
-      alert("Mot de passe minimum 6 caractères");
+      alert("Le mot de passe doit contenir au moins 6 caractères");
       return;
     }
 
-    if (!supabase) {
-      alert("Erreur Supabase");
-      return;
-    }
+    setLoading(true);
 
     const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
+      email: cleanEmail,
+      password: password,
     });
 
-    if (error) alert(error.message);
-    else alert("Compte créé ! Vérifie ton email.");
+    setLoading(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert("Compte créé. Vérifie ton email si Supabase le demande.");
   }
 
   async function handleLogin() {
-    if (!email || !password) {
+    if (!supabase) {
+      alert("Erreur Supabase : connexion impossible");
+      return;
+    }
+
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail || !password) {
       alert("Entre un email et un mot de passe");
       return;
     }
 
-    if (!supabase) {
-      alert("Erreur Supabase");
+    setLoading(true);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password: password,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      alert(error.message);
       return;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
+    alert("Connexion réussie");
+  }
+
+  async function handleLogout() {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setUser(null);
+  }
+
+  async function generateCourse() {
+    if (!matiere || !niveau || !chapitre) {
+      alert("Choisis matière, niveau et chapitre");
+      return;
+    }
+
+    setLoading(true);
+    setAnswer("");
+
+    const question = `
+Cours complet de ${matiere}, niveau ${niveau}, chapitre ${chapitre}.
+Donne :
+1. Cours détaillé
+2. Définitions simples
+3. Exemples corrigés
+4. Exercices progressifs
+5. Corrections détaillées
+6. Évaluation finale avec barème sur 10
+`;
+
+    const res = await fetch("/api/ia", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ question }),
     });
 
-    if (error) alert(error.message);
-    else alert("Connexion réussie !");
+    const json = await res.json();
+    const content = json.answer || "Erreur IA";
+
+    setAnswer(content);
+
+    if (supabase && user) {
+      await supabase.from("courses").insert([
+        {
+          user_id: user.id,
+          matiere,
+          niveau,
+          chapitre,
+          contenu: content,
+        },
+      ]);
+    }
+
+    setLoading(false);
   }
 
   return (
     <main style={styles.page}>
       <section style={styles.hero}>
-        <div style={styles.card}>
-          <h1 style={styles.title}>🎓 EduAI</h1>
-          <p style={styles.subtitle}>
-            Apprends plus vite avec une IA scolaire.
-          </p>
+        <nav style={styles.nav}>
+          <div style={styles.logo}>🤖 EduAI</div>
 
-          <input
-            style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+          <div style={styles.navLinks}>
+            <a href="#generate" style={styles.link}>Générateur</a>
+            <a href="#features" style={styles.link}>Avantages</a>
+            <a href="#pricing" style={styles.link}>Tarifs</a>
 
-          <input
-            style={styles.input}
-            type="password"
-            placeholder="Mot de passe"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+            {user ? (
+              <button onClick={handleLogout} style={styles.navButton}>
+                Déconnexion
+              </button>
+            ) : (
+              <a href="#login" style={styles.cta}>Connexion</a>
+            )}
+          </div>
+        </nav>
 
-          <div style={styles.buttons}>
-            <button style={styles.loginBtn} onClick={handleLogin}>
-              Se connecter
-            </button>
+        <div style={styles.heroContent}>
+          <div style={styles.left}>
+            <span style={styles.badge}>✨ IA éducative premium</span>
 
-            <button style={styles.signupBtn} onClick={handleSignup}>
-              Créer un compte
-            </button>
+            <h1 style={styles.title}>
+              Apprends plus vite avec une IA scolaire.
+            </h1>
+
+            <p style={styles.subtitle}>
+              Génère des cours détaillés, exercices corrigés et évaluations du collège à la prépa.
+            </p>
+
+            <div style={styles.cards}>
+              <div style={styles.miniCard}>🎓 Collège → Prépa</div>
+              <div style={styles.miniCard}>📚 Maths · Physique · Chimie</div>
+              <div style={styles.miniCard}>✅ Corrections incluses</div>
+            </div>
+          </div>
+
+          <div id="login" style={styles.panel}>
+            {!user ? (
+              <>
+                <h2 style={styles.panelTitle}>🔐 Connexion</h2>
+
+                <input
+                  style={styles.input}
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+
+                <input
+                  style={styles.input}
+                  type="password"
+                  placeholder="Mot de passe"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+
+                <div style={styles.buttonRow}>
+                  <button onClick={handleLogin} style={styles.loginBtn}>
+                    {loading ? "..." : "Se connecter"}
+                  </button>
+
+                  <button onClick={handleSignup} style={styles.signupBtn}>
+                    {loading ? "..." : "Créer un compte"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div id="generate">
+                <p style={styles.connected}>✅ Connecté : {user.email}</p>
+                <h2 style={styles.panelTitle}>🤖 Générateur de cours</h2>
+
+                <select
+                  style={styles.input}
+                  value={matiere}
+                  onChange={(e) => {
+                    setMatiere(e.target.value);
+                    setNiveau("");
+                    setChapitre("");
+                  }}
+                >
+                  <option value="">Choisir une matière</option>
+                  {Object.keys(data).map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+
+                <select
+                  style={styles.input}
+                  value={niveau}
+                  onChange={(e) => {
+                    setNiveau(e.target.value);
+                    setChapitre("");
+                  }}
+                >
+                  <option value="">Choisir un niveau</option>
+                  {niveaux.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+
+                <select
+                  style={styles.input}
+                  value={chapitre}
+                  onChange={(e) => setChapitre(e.target.value)}
+                >
+                  <option value="">Choisir un chapitre</option>
+                  {chapitres.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+
+                <button onClick={generateCourse} style={styles.generateBtn}>
+                  {loading ? "Génération..." : "✨ Générer mon cours"}
+                </button>
+
+                {answer && (
+                  <div style={styles.result}>
+                    <h3>📘 Cours généré</h3>
+                    <pre style={styles.pre}>{answer}</pre>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section id="features" style={styles.features}>
+        <h2 style={styles.sectionTitle}>Pourquoi EduAI ?</h2>
+
+        <div style={styles.grid}>
+          <div style={styles.featureCard}>⚡ Cours générés rapidement</div>
+          <div style={styles.featureCard}>🧠 Explications adaptées</div>
+          <div style={styles.featureCard}>✍️ Exercices automatiques</div>
+          <div style={styles.featureCard}>📊 Évaluation finale</div>
+        </div>
+      </section>
+
+      <section id="pricing" style={styles.pricing}>
+        <h2 style={styles.sectionTitle}>Formules</h2>
+
+        <div style={styles.grid}>
+          <div style={styles.priceCard}>
+            <h3>Découverte</h3>
+            <p>Gratuit</p>
+          </div>
+
+          <div style={styles.priceCardPro}>
+            <h3>Pro</h3>
+            <p>IA illimitée</p>
+          </div>
+
+          <div style={styles.priceCard}>
+            <h3>Premium</h3>
+            <p>IA + visio prof</p>
           </div>
         </div>
       </section>
@@ -96,55 +347,162 @@ export default function Home() {
 const styles: any = {
   page: {
     margin: 0,
-    minHeight: "100vh",
     fontFamily: "Arial, sans-serif",
     background: "#0f172a",
+    color: "white",
   },
+
   hero: {
     minHeight: "100vh",
     backgroundImage: `
-      linear-gradient(120deg, rgba(88,28,135,0.9), rgba(37,99,235,0.7)),
+      linear-gradient(
+        120deg,
+        rgba(88,28,135,0.9),
+        rgba(37,99,235,0.75),
+        rgba(14,165,233,0.35)
+      ),
       url('/hero.png')
     `,
     backgroundSize: "cover",
     backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+    padding: 28,
+  },
+
+  nav: {
+    maxWidth: 1280,
+    margin: "0 auto",
+    padding: "18px 24px",
+    borderRadius: 26,
+    background: "rgba(15,23,42,0.45)",
+    backdropFilter: "blur(18px)",
     display: "flex",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
+    border: "1px solid rgba(255,255,255,0.2)",
+    boxShadow: "0 20px 70px rgba(0,0,0,0.25)",
   },
-  card: {
-    width: "100%",
-    maxWidth: 460,
-    background: "rgba(255,255,255,0.92)",
-    padding: 36,
-    borderRadius: 32,
-    boxShadow: "0 30px 90px rgba(0,0,0,0.35)",
+
+  logo: {
+    fontSize: 30,
+    fontWeight: 900,
   },
+
+  navLinks: {
+    display: "flex",
+    gap: 20,
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+
+  link: {
+    color: "#e0f2fe",
+    fontWeight: 800,
+    textDecoration: "none",
+  },
+
+  cta: {
+    background: "linear-gradient(90deg,#facc15,#fb7185)",
+    color: "#111827",
+    padding: "12px 18px",
+    borderRadius: 16,
+    fontWeight: 900,
+    textDecoration: "none",
+  },
+
+  navButton: {
+    background: "rgba(255,255,255,0.15)",
+    color: "white",
+    border: "1px solid rgba(255,255,255,0.25)",
+    padding: "12px 18px",
+    borderRadius: 16,
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
+  heroContent: {
+    maxWidth: 1280,
+    margin: "90px auto 0",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+    gap: 50,
+    alignItems: "center",
+  },
+
+  left: {
+    maxWidth: 700,
+  },
+
+  badge: {
+    background: "rgba(255,255,255,0.18)",
+    padding: "12px 18px",
+    borderRadius: 999,
+    fontWeight: 900,
+    border: "1px solid rgba(255,255,255,0.24)",
+    display: "inline-block",
+  },
+
   title: {
-    fontSize: 42,
-    margin: 0,
-    color: "#0f172a",
+    fontSize: "clamp(48px, 8vw, 86px)",
+    lineHeight: 1,
+    letterSpacing: -3,
+    margin: "30px 0",
+    textShadow: "0 12px 40px rgba(0,0,0,0.35)",
   },
+
   subtitle: {
-    color: "#475569",
-    fontSize: 18,
-    marginBottom: 24,
+    fontSize: 22,
+    lineHeight: 1.6,
+    color: "#e0f2fe",
   },
+
+  cards: {
+    display: "flex",
+    gap: 16,
+    flexWrap: "wrap",
+    marginTop: 35,
+  },
+
+  miniCard: {
+    background: "rgba(255,255,255,0.16)",
+    padding: "18px 22px",
+    borderRadius: 22,
+    fontWeight: 900,
+    border: "1px solid rgba(255,255,255,0.22)",
+    backdropFilter: "blur(14px)",
+  },
+
+  panel: {
+    background: "rgba(255,255,255,0.93)",
+    color: "#0f172a",
+    padding: 36,
+    borderRadius: 36,
+    boxShadow: "0 35px 100px rgba(0,0,0,0.3)",
+    border: "1px solid rgba(255,255,255,0.7)",
+  },
+
+  panelTitle: {
+    fontSize: 34,
+    marginTop: 0,
+    marginBottom: 22,
+  },
+
   input: {
     width: "100%",
-    padding: 16,
+    padding: 18,
     marginTop: 14,
-    borderRadius: 18,
+    borderRadius: 20,
     border: "1px solid #cbd5e1",
     fontSize: 16,
     boxSizing: "border-box",
   },
-  buttons: {
+
+  buttonRow: {
     display: "flex",
     gap: 14,
     marginTop: 22,
   },
+
   loginBtn: {
     flex: 1,
     padding: 16,
@@ -155,6 +513,7 @@ const styles: any = {
     fontWeight: 900,
     cursor: "pointer",
   },
+
   signupBtn: {
     flex: 1,
     padding: 16,
@@ -164,5 +523,89 @@ const styles: any = {
     color: "white",
     fontWeight: 900,
     cursor: "pointer",
+  },
+
+  generateBtn: {
+    width: "100%",
+    marginTop: 22,
+    padding: 18,
+    border: "none",
+    borderRadius: 20,
+    background: "linear-gradient(90deg,#7c3aed,#2563eb,#06b6d4)",
+    color: "white",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
+  connected: {
+    background: "#dcfce7",
+    color: "#166534",
+    padding: 12,
+    borderRadius: 14,
+    fontWeight: 800,
+  },
+
+  result: {
+    marginTop: 24,
+    background: "#0f172a",
+    color: "white",
+    padding: 20,
+    borderRadius: 22,
+    maxHeight: 360,
+    overflow: "auto",
+  },
+
+  pre: {
+    whiteSpace: "pre-wrap",
+    lineHeight: 1.7,
+    fontFamily: "Arial, sans-serif",
+  },
+
+  features: {
+    padding: "80px 24px",
+    background: "linear-gradient(180deg,#0f172a,#1e293b)",
+  },
+
+  pricing: {
+    padding: "80px 24px",
+    background: "#f8fafc",
+    color: "#0f172a",
+  },
+
+  sectionTitle: {
+    textAlign: "center",
+    fontSize: "clamp(34px,5vw,54px)",
+    marginBottom: 40,
+  },
+
+  grid: {
+    maxWidth: 1100,
+    margin: "0 auto",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: 20,
+  },
+
+  featureCard: {
+    background: "rgba(255,255,255,0.09)",
+    padding: 26,
+    borderRadius: 26,
+    fontWeight: 900,
+    border: "1px solid rgba(255,255,255,0.14)",
+  },
+
+  priceCard: {
+    background: "white",
+    padding: 28,
+    borderRadius: 28,
+    boxShadow: "0 20px 60px rgba(15,23,42,0.08)",
+  },
+
+  priceCardPro: {
+    background: "linear-gradient(135deg,#7c3aed,#2563eb)",
+    color: "white",
+    padding: 28,
+    borderRadius: 28,
+    boxShadow: "0 24px 80px rgba(37,99,235,0.25)",
   },
 };
