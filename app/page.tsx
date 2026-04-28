@@ -1,8 +1,8 @@
-import { supabase } from "../lib/supabase";
 "use client";
 
 import { useMemo, useState } from "react";
 import { data } from "../data/courses";
+import { supabase } from "../lib/supabase";
 
 export default function Home() {
   const [matiere, setMatiere] = useState("");
@@ -19,9 +19,11 @@ export default function Home() {
   const chapitres = useMemo(() => {
     if (!matiere || !niveau) return [];
     const categories = data[matiere];
+
     for (const cat in categories) {
       if (categories[cat][niveau]) return categories[cat][niveau];
     }
+
     return [];
   }, [matiere, niveau]);
 
@@ -54,7 +56,20 @@ Donne :
     });
 
     const dataRes = await res.json();
-    setAnswer(dataRes.answer || "Erreur IA");
+    const content = dataRes.answer || "Erreur IA";
+
+    setAnswer(content);
+
+    await supabase.from("courses").insert([
+      {
+        user_id: "demo",
+        matiere,
+        niveau,
+        chapitre,
+        contenu: content,
+      },
+    ]);
+
     setLoading(false);
   }
 
@@ -63,6 +78,7 @@ Donne :
       <section style={styles.hero}>
         <nav style={styles.nav}>
           <div style={styles.logo}>🤖 EduAI</div>
+
           <div style={styles.navLinks}>
             <a href="#ia" style={styles.link}>Générateur</a>
             <a href="#features" style={styles.link}>Avantages</a>
