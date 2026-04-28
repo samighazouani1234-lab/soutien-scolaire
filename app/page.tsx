@@ -1,15 +1,22 @@
 "use client"
 
 import { useState } from "react"
-import { supabase } from "@/lib/supabase"
+import { getSupabaseClient } from "../lib/supabase"
 
 export default function Home() {
+  const supabase = getSupabaseClient()
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
 
   // 🔐 INSCRIPTION
   const handleSignup = async () => {
+    if (!supabase) {
+      alert("Erreur Supabase ❌")
+      return
+    }
+
     setLoading(true)
 
     const { error } = await supabase.auth.signUp({
@@ -28,6 +35,11 @@ export default function Home() {
 
   // 🔐 CONNEXION
   const handleLogin = async () => {
+    if (!supabase) {
+      alert("Erreur Supabase ❌")
+      return
+    }
+
     setLoading(true)
 
     const { error } = await supabase.auth.signInWithPassword({
@@ -47,40 +59,33 @@ export default function Home() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900 text-white">
       
-      {/* BACKGROUND OVERLAY */}
+      {/* overlay */}
       <div className="absolute inset-0 bg-black/40" />
 
-      {/* CONTENU */}
-      <div className="relative z-10 grid md:grid-cols-2 gap-10 items-center max-w-6xl w-full px-6">
+      <div className="relative z-10 grid md:grid-cols-2 gap-10 max-w-6xl w-full px-6">
 
-        {/* TEXTE GAUCHE */}
+        {/* LEFT */}
         <div>
-          <h1 className="text-5xl font-bold leading-tight">
-            Apprends plus vite <br /> avec une IA scolaire 🚀
+          <h1 className="text-5xl font-bold">
+            Apprends plus vite <br /> avec une IA 🚀
           </h1>
 
-          <p className="mt-4 text-lg text-gray-300">
-            Génère des cours, exercices et corrections automatiquement.
+          <p className="mt-4 text-gray-300">
+            Génère des cours automatiquement avec intelligence artificielle.
           </p>
-
-          <div className="mt-6 flex gap-4 flex-wrap">
-            <span className="bg-white/10 px-4 py-2 rounded-full">📚 Collège → Prépa</span>
-            <span className="bg-white/10 px-4 py-2 rounded-full">🧪 Maths • Physique</span>
-            <span className="bg-white/10 px-4 py-2 rounded-full">✅ Corrections incluses</span>
-          </div>
         </div>
 
-        {/* FORMULAIRE */}
-        <div className="bg-white/10 backdrop-blur-lg p-8 rounded-2xl shadow-xl border border-white/20">
+        {/* RIGHT FORM */}
+        <div className="bg-white/10 backdrop-blur-lg p-8 rounded-2xl border border-white/20">
 
-          <h2 className="text-2xl font-semibold mb-6 text-center">
+          <h2 className="text-2xl mb-6 text-center">
             🔐 Connexion
           </h2>
 
           <input
             type="email"
             placeholder="Email"
-            className="w-full p-3 mb-3 rounded-lg bg-white/20 placeholder-gray-300 outline-none"
+            className="w-full p-3 mb-3 rounded bg-white/20"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
@@ -88,7 +93,7 @@ export default function Home() {
           <input
             type="password"
             placeholder="Mot de passe"
-            className="w-full p-3 mb-4 rounded-lg bg-white/20 placeholder-gray-300 outline-none"
+            className="w-full p-3 mb-4 rounded bg-white/20"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
@@ -97,7 +102,7 @@ export default function Home() {
             <button
               onClick={handleLogin}
               disabled={loading}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 p-3 rounded-lg font-semibold"
+              className="flex-1 bg-blue-600 p-3 rounded"
             >
               Se connecter
             </button>
@@ -105,7 +110,7 @@ export default function Home() {
             <button
               onClick={handleSignup}
               disabled={loading}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 p-3 rounded-lg font-semibold"
+              className="flex-1 bg-purple-600 p-3 rounded"
             >
               S’inscrire
             </button>
