@@ -689,3 +689,6 @@ const styles: any = {
     border: "1px solid rgba(255,255,255,0.14)",
   },
 };
+<a href="/dashboard" style={styles.link}>
+  Dashboard
+</a>
