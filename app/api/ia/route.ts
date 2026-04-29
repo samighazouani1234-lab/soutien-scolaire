@@ -1,51 +1,120 @@
-import { NextResponse } from "next/server";
+"use client";
 
-export async function POST(req: Request) {
-  try {
-    const { question } = await req.json();
+import { useState } from "react";
 
-    if (!question) {
-      return NextResponse.json({ answer: "Question manquante." });
+export default function Home() {
+  const [matiere, setMatiere] = useState("");
+  const [niveau, setNiveau] = useState("");
+  const [chapitre, setChapitre] = useState("");
+
+  const [answer, setAnswer] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function generateCourse() {
+    if (!matiere || !niveau || !chapitre) {
+      alert("Choisis une matière, un niveau et un chapitre");
+      return;
     }
 
-    const res = await fetch("https://api.together.xyz/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.TOGETHER_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-        messages: [
-          {
-            role: "system",
-            content:
-              "Tu es un excellent professeur français. Tu crées des cours scolaires clairs, complets, structurés, avec exercices et corrections.",
-          },
-          {
-            role: "user",
-            content: question,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 3500,
-      }),
-    });
+    setLoading(true);
+    setAnswer("");
 
-    const data = await res.json();
+    const question = `
+Crée un cours scolaire PREMIUM.
 
-    if (!res.ok) {
-      return NextResponse.json({
-        answer: data?.error?.message || "Erreur Together AI.",
+Matière : ${matiere}
+Niveau : ${niveau}
+Chapitre : ${chapitre}
+
+Structure obligatoire :
+
+1. Objectifs du chapitre
+2. Cours détaillé
+3. Définitions importantes
+4. Méthode étape par étape
+5. Exemples corrigés
+6. Exercices progressifs
+7. Corrections détaillées
+8. Évaluation finale avec barème /20
+9. Résumé clair à retenir
+`;
+
+    try {
+      const res = await fetch("/api/ia", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ question }),
       });
+
+      const data = await res.json();
+      setAnswer(data.answer || "Erreur IA");
+    } catch (e) {
+      setAnswer("Erreur serveur");
     }
 
-    return NextResponse.json({
-      answer: data.choices?.[0]?.message?.content || "Aucune réponse IA.",
-    });
-  } catch {
-    return NextResponse.json({
-      answer: "Erreur serveur IA.",
-    });
+    setLoading(false);
   }
+
+  return (
+    <main className="min-h-screen bg-gradient-to-r from-purple-600 to-blue-600 text-white flex flex-col items-center justify-center p-6">
+      
+      {/* TITRE */}
+      <h1 className="text-5xl font-bold mb-6 text-center">
+        🚀 EduAI – Générateur de cours
+      </h1>
+
+      <p className="mb-10 text-center max-w-xl">
+        Génère des cours complets avec intelligence artificielle.
+      </p>
+
+      {/* FORM */}
+      <div className="bg-white text-black p-6 rounded-2xl shadow-xl w-full max-w-xl">
+        
+        <select
+          className="w-full p-3 mb-4 border rounded"
+          onChange={(e) => setMatiere(e.target.value)}
+        >
+          <option value="">Choisir une matière</option>
+          <option>Mathématiques</option>
+          <option>Physique</option>
+          <option>Chimie</option>
+          <option>Français</option>
+          <option>Histoire</option>
+        </select>
+
+        <select
+          className="w-full p-3 mb-4 border rounded"
+          onChange={(e) => setNiveau(e.target.value)}
+        >
+          <option value="">Choisir un niveau</option>
+          <option>Collège</option>
+          <option>Lycée</option>
+          <option>Supérieur</option>
+        </select>
+
+        <input
+          type="text"
+          placeholder="Chapitre (ex: dérivées, équations...)"
+          className="w-full p-3 mb-4 border rounded"
+          onChange={(e) => setChapitre(e.target.value)}
+        />
+
+        <button
+          onClick={generateCourse}
+          className="w-full bg-blue-600 text-white p-3 rounded font-bold hover:bg-blue-700"
+        >
+          {loading ? "Génération..." : "Générer le cours"}
+        </button>
+      </div>
+
+      {/* RESULTAT */}
+      {answer && (
+        <div className="mt-10 bg-white text-black p-6 rounded-2xl shadow-xl max-w-3xl whitespace-pre-wrap">
+          {answer}
+        </div>
+      )}
+    </main>
+  );
 }
