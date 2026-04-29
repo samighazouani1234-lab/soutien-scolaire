@@ -1,36 +1,125 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { jsPDF } from "jspdf";
 import { data } from "../data/courses";
+import { getSupabaseClient } from "../lib/supabase";
 
 export default function Home() {
+  const [user, setUser] = useState<any>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
   const [matiere, setMatiere] = useState("");
   const [niveau, setNiveau] = useState("");
   const [chapitre, setChapitre] = useState("");
+
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const resultRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
 
-  const niveaux =
-    matiere && (data as any)[matiere]
-      ? Object.values((data as any)[matiere]).flatMap((cat: any) =>
-          Object.keys(cat)
-        )
-      : [];
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+    });
 
-  const chapitres = (() => {
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user || null);
+      }
+    );
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  const niveaux = useMemo(() => {
+    if (!matiere) return [];
+    const selected = (data as any)[matiere];
+    if (!selected) return [];
+    return Object.values(selected).flatMap((cat: any) => Object.keys(cat));
+  }, [matiere]);
+
+  const chapitres = useMemo(() => {
     if (!matiere || !niveau) return [];
     const selected = (data as any)[matiere];
+    if (!selected) return [];
 
     for (const cat in selected) {
       if (selected[cat][niveau]) return selected[cat][niveau];
     }
 
     return [];
-  })();
+  }, [matiere, niveau]);
+
+  async function handleSignup() {
+    const supabase = getSupabaseClient();
+    if (!supabase) return alert("Erreur Supabase");
+
+    if (!email.trim() || !password) {
+      alert("Entre un email et un mot de passe");
+      return;
+    }
+
+    if (password.length < 6) {
+      alert("Mot de passe minimum 6 caractères");
+      return;
+    }
+
+    setLoading(true);
+
+    const { error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+    });
+
+    setLoading(false);
+
+    if (error) alert(error.message);
+    else alert("Compte créé !");
+  }
+
+  async function handleLogin() {
+    const supabase = getSupabaseClient();
+    if (!supabase) return alert("Erreur Supabase");
+
+    if (!email.trim() || !password) {
+      alert("Entre un email et un mot de passe");
+      return;
+    }
+
+    setLoading(true);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    setLoading(false);
+
+    if (error) alert(error.message);
+    else {
+      setUser(data.user);
+      alert("Connexion réussie");
+    }
+  }
+
+  async function handleLogout() {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    await supabase.auth.signOut();
+    setUser(null);
+    setAnswer("");
+  }
 
   async function generateCourse() {
+    if (!user) {
+      alert("Connecte-toi pour générer un cours");
+      return;
+    }
+
     if (!matiere || !niveau || !chapitre) {
       alert("Choisis une matière, un niveau et un chapitre");
       return;
@@ -58,157 +147,222 @@ Structure obligatoire :
 9. Résumé à retenir
 `;
 
-    const res = await fetch("/api/ia", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ question }),
-    });
+    try {
+      const res = await fetch("/api/ia", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ question }),
+      });
 
-    const json = await res.json();
-    setAnswer(json.answer || "Erreur IA");
+      const json = await res.json();
+      setAnswer(json.answer || "Erreur IA");
+    } catch {
+      setAnswer("Erreur serveur IA.");
+    }
+
     setLoading(false);
   }
 
   function downloadPDF() {
-    window.print();
+    if (!answer) {
+      alert("Génère d’abord un cours");
+      return;
+    }
+
+    const pdf = new jsPDF("p", "mm", "a4");
+
+    const title = `${matiere} - ${niveau}`;
+    const subtitle = chapitre;
+
+    let y = 18;
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(18);
+    pdf.text(title, 15, y);
+
+    y += 9;
+
+    pdf.setFontSize(13);
+    pdf.setTextColor(37, 99, 235);
+    pdf.text(subtitle, 15, y);
+
+    y += 12;
+
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(11);
+
+    const lines = pdf.splitTextToSize(answer, 180);
+
+    lines.forEach((line: string) => {
+      if (y > 280) {
+        pdf.addPage();
+        y = 18;
+      }
+
+      pdf.text(line, 15, y);
+      y += 6;
+    });
+
+    pdf.save(`cours-${chapitre}.pdf`);
   }
 
   return (
-    <>
-      <style>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
+    <main style={styles.page}>
+      <section style={styles.hero}>
+        <nav style={styles.nav}>
+          <div style={styles.logo}>🤖 EduAI</div>
 
-          .print-area, .print-area * {
-            visibility: visible;
-          }
+          <div style={styles.navLinks}>
+            <a href="#generator" style={styles.link}>Générateur</a>
+            <a href="#features" style={styles.link}>Avantages</a>
 
-          .print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            background: white !important;
-            color: black !important;
-            padding: 40px;
-          }
-
-          .no-print {
-            display: none !important;
-          }
-        }
-      `}</style>
-
-      <main style={styles.page}>
-        <section style={styles.hero} className="no-print">
-          <nav style={styles.nav}>
-            <div style={styles.logo}>🤖 EduAI</div>
-            <a href="#generator" style={styles.cta}>
-              Générer un cours
-            </a>
-          </nav>
-
-          <div style={styles.heroGrid}>
-            <div>
-              <span style={styles.badge}>✨ IA scolaire premium</span>
-
-              <h1 style={styles.title}>
-                Génère des cours haut de gamme avec l’IA.
-              </h1>
-
-              <p style={styles.subtitle}>
-                Cours détaillés, exercices corrigés, évaluations et export PDF
-                en quelques secondes.
-              </p>
-
-              <div style={styles.tags}>
-                <span style={styles.tag}>🎓 Collège → Prépa</span>
-                <span style={styles.tag}>📚 Maths · Physique · Chimie</span>
-                <span style={styles.tag}>📄 PDF exportable</span>
-              </div>
-            </div>
-
-            <div id="generator" style={styles.card}>
-              <h2 style={styles.cardTitle}>Créer un cours</h2>
-
-              <select
-                style={styles.input}
-                value={matiere}
-                onChange={(e) => {
-                  setMatiere(e.target.value);
-                  setNiveau("");
-                  setChapitre("");
-                }}
-              >
-                <option value="">Choisir une matière</option>
-                {Object.keys(data).map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                style={styles.input}
-                value={niveau}
-                onChange={(e) => {
-                  setNiveau(e.target.value);
-                  setChapitre("");
-                }}
-              >
-                <option value="">Choisir un niveau</option>
-                {niveaux.map((n: any) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                style={styles.input}
-                value={chapitre}
-                onChange={(e) => setChapitre(e.target.value)}
-              >
-                <option value="">Choisir un chapitre</option>
-                {chapitres.map((c: any) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-
-              <button onClick={generateCourse} style={styles.button}>
-                {loading ? "Génération en cours..." : "✨ Générer le cours"}
+            {user ? (
+              <button onClick={handleLogout} style={styles.logout}>
+                Déconnexion
               </button>
+            ) : (
+              <a href="#login" style={styles.cta}>Connexion</a>
+            )}
+          </div>
+        </nav>
+
+        <div style={styles.heroGrid}>
+          <div style={styles.left}>
+            <span style={styles.badge}>✨ IA éducative premium</span>
+
+            <h1 style={styles.title}>
+              Génère des cours haut de gamme avec l’IA.
+            </h1>
+
+            <p style={styles.subtitle}>
+              Cours détaillés, exercices corrigés, évaluations et PDF en quelques secondes.
+            </p>
+
+            <div style={styles.tags}>
+              <span style={styles.tag}>🎓 Collège → Prépa</span>
+              <span style={styles.tag}>📚 Maths · Physique · Chimie</span>
+              <span style={styles.tag}>📄 PDF téléchargeable</span>
             </div>
           </div>
+
+          <div id="login" style={styles.card}>
+            {!user ? (
+              <>
+                <h2 style={styles.cardTitle}>🔐 Connexion</h2>
+
+                <input
+                  style={styles.input}
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+
+                <input
+                  style={styles.input}
+                  type="password"
+                  placeholder="Mot de passe"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+
+                <div style={styles.row}>
+                  <button onClick={handleLogin} style={styles.blueBtn}>
+                    {loading ? "..." : "Se connecter"}
+                  </button>
+
+                  <button onClick={handleSignup} style={styles.purpleBtn}>
+                    {loading ? "..." : "Créer un compte"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div id="generator">
+                <p style={styles.connected}>✅ Connecté : {user.email}</p>
+
+                <h2 style={styles.cardTitle}>Créer un cours</h2>
+
+                <select
+                  style={styles.input}
+                  value={matiere}
+                  onChange={(e) => {
+                    setMatiere(e.target.value);
+                    setNiveau("");
+                    setChapitre("");
+                  }}
+                >
+                  <option value="">Choisir une matière</option>
+                  {Object.keys(data).map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+
+                <select
+                  style={styles.input}
+                  value={niveau}
+                  onChange={(e) => {
+                    setNiveau(e.target.value);
+                    setChapitre("");
+                  }}
+                >
+                  <option value="">Choisir un niveau</option>
+                  {niveaux.map((n: any) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+
+                <select
+                  style={styles.input}
+                  value={chapitre}
+                  onChange={(e) => setChapitre(e.target.value)}
+                >
+                  <option value="">Choisir un chapitre</option>
+                  {chapitres.map((c: any) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+
+                <button onClick={generateCourse} style={styles.generateBtn}>
+                  {loading ? "Génération..." : "✨ Générer le cours"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {answer && (
+        <section style={styles.resultSection}>
+          <div style={styles.resultHeader}>
+            <h2>📘 Cours généré</h2>
+
+            <button onClick={downloadPDF} style={styles.pdfBtn}>
+              📄 Télécharger PDF
+            </button>
+          </div>
+
+          <div style={styles.result}>
+            <h1 style={styles.pdfTitle}>{matiere} — {niveau}</h1>
+            <h2 style={styles.pdfSubtitle}>{chapitre}</h2>
+            <pre style={styles.pre}>{answer}</pre>
+          </div>
         </section>
+      )}
 
-        {answer && (
-          <section style={styles.resultSection}>
-            <div style={styles.resultHeader} className="no-print">
-              <h2>📘 Cours généré</h2>
+      <section id="features" style={styles.features}>
+        <h2 style={styles.sectionTitle}>Pourquoi EduAI ?</h2>
 
-              <button onClick={downloadPDF} style={styles.pdfButton}>
-                📄 Télécharger en PDF
-              </button>
-            </div>
-
-            <div ref={resultRef} className="print-area" style={styles.result}>
-              <h1 style={styles.pdfTitle}>
-                {matiere} — {niveau}
-              </h1>
-              <h2 style={styles.pdfSubtitle}>{chapitre}</h2>
-              <pre style={styles.pre}>{answer}</pre>
-            </div>
-          </section>
-        )}
-      </main>
-    </>
+        <div style={styles.grid}>
+          <div style={styles.featureCard}>⚡ Génération rapide</div>
+          <div style={styles.featureCard}>🧠 Explications détaillées</div>
+          <div style={styles.featureCard}>✍️ Exercices corrigés</div>
+          <div style={styles.featureCard}>📄 Export PDF</div>
+        </div>
+      </section>
+    </main>
   );
 }
 
@@ -255,6 +409,19 @@ const styles: any = {
     fontWeight: 900,
   },
 
+  navLinks: {
+    display: "flex",
+    gap: 18,
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+
+  link: {
+    color: "#e0f2fe",
+    fontWeight: 900,
+    textDecoration: "none",
+  },
+
   cta: {
     background: "linear-gradient(90deg,#facc15,#fb7185)",
     color: "#111827",
@@ -264,6 +431,16 @@ const styles: any = {
     textDecoration: "none",
   },
 
+  logout: {
+    background: "#ef4444",
+    color: "white",
+    border: 0,
+    padding: "13px 20px",
+    borderRadius: 18,
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
   heroGrid: {
     maxWidth: 1280,
     margin: "90px auto 0",
@@ -271,6 +448,10 @@ const styles: any = {
     gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))",
     gap: 50,
     alignItems: "center",
+  },
+
+  left: {
+    maxWidth: 720,
   },
 
   badge: {
@@ -335,7 +516,43 @@ const styles: any = {
     boxSizing: "border-box",
   },
 
-  button: {
+  row: {
+    display: "flex",
+    gap: 14,
+    marginTop: 22,
+  },
+
+  blueBtn: {
+    flex: 1,
+    padding: 16,
+    border: "none",
+    borderRadius: 18,
+    background: "#2563eb",
+    color: "white",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
+  purpleBtn: {
+    flex: 1,
+    padding: 16,
+    border: "none",
+    borderRadius: 18,
+    background: "#7c3aed",
+    color: "white",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
+  connected: {
+    background: "#dcfce7",
+    color: "#166534",
+    padding: 12,
+    borderRadius: 14,
+    fontWeight: 900,
+  },
+
+  generateBtn: {
     width: "100%",
     marginTop: 22,
     padding: 18,
@@ -363,7 +580,7 @@ const styles: any = {
     marginBottom: 20,
   },
 
-  pdfButton: {
+  pdfBtn: {
     background: "linear-gradient(90deg,#22c55e,#06b6d4)",
     color: "white",
     padding: "14px 20px",
@@ -395,5 +612,32 @@ const styles: any = {
     fontFamily: "Arial, sans-serif",
     lineHeight: 1.7,
     fontSize: 16,
+  },
+
+  features: {
+    padding: "80px 24px",
+    background: "linear-gradient(180deg,#0f172a,#1e293b)",
+  },
+
+  sectionTitle: {
+    textAlign: "center",
+    fontSize: "clamp(34px,5vw,54px)",
+    marginBottom: 40,
+  },
+
+  grid: {
+    maxWidth: 1100,
+    margin: "0 auto",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
+    gap: 20,
+  },
+
+  featureCard: {
+    background: "rgba(255,255,255,0.09)",
+    padding: 26,
+    borderRadius: 26,
+    fontWeight: 900,
+    border: "1px solid rgba(255,255,255,0.14)",
   },
 };
