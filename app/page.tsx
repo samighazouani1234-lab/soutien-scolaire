@@ -6,15 +6,15 @@ import { getSupabaseClient } from "../lib/supabase";
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const [matiere, setMatiere] = useState("");
   const [niveau, setNiveau] = useState("");
   const [chapitre, setChapitre] = useState("");
-  const [answer, setAnswer] = useState("");
+  const [customTopic, setCustomTopic] = useState("");
 
+  const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -38,25 +38,19 @@ export default function Home() {
 
   const niveaux = useMemo(() => {
     if (!matiere) return [];
-
     const selected = (data as any)[matiere];
     if (!selected) return [];
 
-    return Object.values(selected).flatMap((categorie: any) =>
-      Object.keys(categorie)
-    );
+    return Object.values(selected).flatMap((cat: any) => Object.keys(cat));
   }, [matiere]);
 
   const chapitres = useMemo(() => {
     if (!matiere || !niveau) return [];
-
     const selected = (data as any)[matiere];
     if (!selected) return [];
 
-    for (const categorie in selected) {
-      if (selected[categorie][niveau]) {
-        return selected[categorie][niveau];
-      }
+    for (const cat in selected) {
+      if (selected[cat][niveau]) return selected[cat][niveau];
     }
 
     return [];
@@ -64,21 +58,12 @@ export default function Home() {
 
   async function handleSignup() {
     const supabase = getSupabaseClient();
-
-    if (!supabase) {
-      alert("Erreur Supabase");
-      return;
-    }
+    if (!supabase) return alert("Erreur Supabase");
 
     const cleanEmail = email.trim();
 
     if (!cleanEmail || !password) {
       alert("Entre un email et un mot de passe");
-      return;
-    }
-
-    if (!cleanEmail.includes("@")) {
-      alert("Email invalide");
       return;
     }
 
@@ -96,21 +81,13 @@ export default function Home() {
 
     setLoading(false);
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    alert("Compte créé. Tu peux maintenant te connecter.");
+    if (error) alert(error.message);
+    else alert("Compte créé. Tu peux maintenant te connecter.");
   }
 
   async function handleLogin() {
     const supabase = getSupabaseClient();
-
-    if (!supabase) {
-      alert("Erreur Supabase");
-      return;
-    }
+    if (!supabase) return alert("Erreur Supabase");
 
     const cleanEmail = email.trim();
 
@@ -128,12 +105,8 @@ export default function Home() {
 
     setLoading(false);
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    alert("Connexion réussie");
+    if (error) alert(error.message);
+    else alert("Connexion réussie");
   }
 
   async function handleLogout() {
@@ -148,6 +121,11 @@ export default function Home() {
   async function generateCourse() {
     const supabase = getSupabaseClient();
 
+    if (!user) {
+      alert("Connecte-toi pour générer un cours");
+      return;
+    }
+
     if (!matiere || !niveau || !chapitre) {
       alert("Choisis une matière, un niveau et un chapitre");
       return;
@@ -156,18 +134,19 @@ export default function Home() {
     setLoading(true);
     setAnswer("");
 
-    try {
-      const question = `
+    const question = `
 Cours complet de ${matiere}, niveau ${niveau}, chapitre ${chapitre}.
-Donne :
-1. Un cours détaillé
-2. Des définitions simples
-3. Des exemples corrigés
-4. Des exercices progressifs
-5. Les corrections détaillées
-6. Une évaluation finale avec barème sur 10
+
+Ajoute :
+1. Cours détaillé
+2. Définitions simples
+3. Exemples corrigés
+4. Exercices progressifs
+5. Corrections détaillées
+6. Évaluation finale avec barème sur 10
 `;
 
+    try {
       const res = await fetch("/api/ia", {
         method: "POST",
         headers: {
@@ -181,7 +160,7 @@ Donne :
 
       setAnswer(content);
 
-      if (supabase && user) {
+      if (supabase) {
         await supabase.from("courses").insert([
           {
             user_id: user.id,
@@ -192,7 +171,67 @@ Donne :
           },
         ]);
       }
-    } catch (error) {
+    } catch {
+      setAnswer("Erreur pendant la génération du cours.");
+    }
+
+    setLoading(false);
+  }
+
+  async function generateCustomCourse() {
+    const supabase = getSupabaseClient();
+
+    if (!user) {
+      alert("Connecte-toi pour écrire un cours");
+      return;
+    }
+
+    if (!customTopic.trim()) {
+      alert("Écris le sujet du cours");
+      return;
+    }
+
+    setLoading(true);
+    setAnswer("");
+
+    const question = `
+Crée un cours complet sur : ${customTopic}.
+
+Ajoute :
+1. Cours détaillé
+2. Définitions simples
+3. Exemples corrigés
+4. Exercices progressifs
+5. Corrections détaillées
+6. Évaluation finale avec barème sur 10
+`;
+
+    try {
+      const res = await fetch("/api/ia", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ question }),
+      });
+
+      const json = await res.json();
+      const content = json.answer || "Erreur IA";
+
+      setAnswer(content);
+
+      if (supabase) {
+        await supabase.from("courses").insert([
+          {
+            user_id: user.id,
+            matiere: "Cours libre",
+            niveau: "Libre",
+            chapitre: customTopic,
+            contenu: content,
+          },
+        ]);
+      }
+    } catch {
       setAnswer("Erreur pendant la génération du cours.");
     }
 
@@ -206,14 +245,16 @@ Donne :
           <div style={styles.logo}>🤖 EduAI</div>
 
           <div style={styles.navLinks}>
+            <a href="#write" style={styles.writeButton}>
+              ✍️ Écrire un cours
+            </a>
+
             <a href="#generate" style={styles.link}>
               Générateur
             </a>
+
             <a href="#features" style={styles.link}>
               Avantages
-            </a>
-            <a href="#pricing" style={styles.link}>
-              Tarifs
             </a>
 
             {user ? (
@@ -237,8 +278,7 @@ Donne :
             </h1>
 
             <p style={styles.subtitle}>
-              Génère des cours détaillés, exercices corrigés et évaluations du
-              collège à la prépa.
+              Génère des cours détaillés, exercices corrigés et évaluations du collège à la prépa.
             </p>
 
             <div style={styles.cards}>
@@ -280,60 +320,77 @@ Donne :
                 </div>
               </>
             ) : (
-              <div id="generate">
+              <>
                 <p style={styles.connected}>✅ Connecté : {user.email}</p>
 
-                <h2 style={styles.panelTitle}>🤖 Générateur de cours</h2>
+                <div id="write" style={styles.block}>
+                  <h2 style={styles.panelTitle}>✍️ Écrire un cours</h2>
 
-                <select
-                  style={styles.input}
-                  value={matiere}
-                  onChange={(e) => {
-                    setMatiere(e.target.value);
-                    setNiveau("");
-                    setChapitre("");
-                  }}
-                >
-                  <option value="">Choisir une matière</option>
-                  {Object.keys(data).map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
+                  <textarea
+                    style={styles.textarea}
+                    placeholder="Ex : Les limites en Terminale, les fractions en 5e, la mécanique en MPSI..."
+                    value={customTopic}
+                    onChange={(e) => setCustomTopic(e.target.value)}
+                  />
 
-                <select
-                  style={styles.input}
-                  value={niveau}
-                  onChange={(e) => {
-                    setNiveau(e.target.value);
-                    setChapitre("");
-                  }}
-                >
-                  <option value="">Choisir un niveau</option>
-                  {niveaux.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
+                  <button onClick={generateCustomCourse} style={styles.generateBtn}>
+                    {loading ? "Génération..." : "Créer ce cours"}
+                  </button>
+                </div>
 
-                <select
-                  style={styles.input}
-                  value={chapitre}
-                  onChange={(e) => setChapitre(e.target.value)}
-                >
-                  <option value="">Choisir un chapitre</option>
-                  {chapitres.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                <div id="generate" style={styles.block}>
+                  <h2 style={styles.panelTitle}>🤖 Générateur par chapitre</h2>
 
-                <button onClick={generateCourse} style={styles.generateBtn}>
-                  {loading ? "Génération..." : "✨ Générer mon cours"}
-                </button>
+                  <select
+                    style={styles.input}
+                    value={matiere}
+                    onChange={(e) => {
+                      setMatiere(e.target.value);
+                      setNiveau("");
+                      setChapitre("");
+                    }}
+                  >
+                    <option value="">Choisir une matière</option>
+                    {Object.keys(data).map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    style={styles.input}
+                    value={niveau}
+                    onChange={(e) => {
+                      setNiveau(e.target.value);
+                      setChapitre("");
+                    }}
+                  >
+                    <option value="">Choisir un niveau</option>
+                    {niveaux.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    style={styles.input}
+                    value={chapitre}
+                    onChange={(e) => setChapitre(e.target.value)}
+                  >
+                    <option value="">Choisir un chapitre</option>
+                    {chapitres.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button onClick={generateCourse} style={styles.generateBtn}>
+                    {loading ? "Génération..." : "✨ Générer mon cours"}
+                  </button>
+                </div>
 
                 {answer && (
                   <div style={styles.result}>
@@ -341,7 +398,7 @@ Donne :
                     <pre style={styles.pre}>{answer}</pre>
                   </div>
                 )}
-              </div>
+              </>
             )}
           </div>
         </div>
@@ -355,27 +412,6 @@ Donne :
           <div style={styles.featureCard}>🧠 Explications adaptées</div>
           <div style={styles.featureCard}>✍️ Exercices automatiques</div>
           <div style={styles.featureCard}>📊 Évaluation finale</div>
-        </div>
-      </section>
-
-      <section id="pricing" style={styles.pricing}>
-        <h2 style={styles.sectionTitle}>Formules</h2>
-
-        <div style={styles.grid}>
-          <div style={styles.priceCard}>
-            <h3>Découverte</h3>
-            <p>Gratuit</p>
-          </div>
-
-          <div style={styles.priceCardPro}>
-            <h3>Pro</h3>
-            <p>IA illimitée</p>
-          </div>
-
-          <div style={styles.priceCard}>
-            <h3>Premium</h3>
-            <p>IA + visio prof</p>
-          </div>
         </div>
       </section>
     </main>
@@ -428,7 +464,7 @@ const styles: any = {
 
   navLinks: {
     display: "flex",
-    gap: 20,
+    gap: 14,
     alignItems: "center",
     flexWrap: "wrap",
   },
@@ -436,6 +472,15 @@ const styles: any = {
   link: {
     color: "#e0f2fe",
     fontWeight: 800,
+    textDecoration: "none",
+  },
+
+  writeButton: {
+    background: "linear-gradient(90deg,#22c55e,#06b6d4)",
+    color: "white",
+    padding: "12px 18px",
+    borderRadius: 16,
+    fontWeight: 900,
     textDecoration: "none",
   },
 
@@ -511,7 +556,7 @@ const styles: any = {
   },
 
   panel: {
-    background: "rgba(255,255,255,0.93)",
+    background: "rgba(255,255,255,0.94)",
     color: "#0f172a",
     padding: 36,
     borderRadius: 36,
@@ -520,19 +565,37 @@ const styles: any = {
   },
 
   panelTitle: {
-    fontSize: 34,
+    fontSize: 28,
     marginTop: 0,
-    marginBottom: 22,
+    marginBottom: 18,
+  },
+
+  block: {
+    marginTop: 28,
+    paddingTop: 22,
+    borderTop: "1px solid #e2e8f0",
   },
 
   input: {
     width: "100%",
-    padding: 18,
-    marginTop: 14,
-    borderRadius: 20,
+    padding: 16,
+    marginTop: 12,
+    borderRadius: 18,
     border: "1px solid #cbd5e1",
     fontSize: 16,
     boxSizing: "border-box",
+  },
+
+  textarea: {
+    width: "100%",
+    minHeight: 110,
+    padding: 16,
+    marginTop: 12,
+    borderRadius: 18,
+    border: "1px solid #cbd5e1",
+    fontSize: 16,
+    boxSizing: "border-box",
+    resize: "vertical",
   },
 
   buttonRow: {
@@ -565,7 +628,7 @@ const styles: any = {
 
   generateBtn: {
     width: "100%",
-    marginTop: 22,
+    marginTop: 18,
     padding: 18,
     border: "none",
     borderRadius: 20,
@@ -589,7 +652,7 @@ const styles: any = {
     color: "white",
     padding: 20,
     borderRadius: 22,
-    maxHeight: 360,
+    maxHeight: 420,
     overflow: "auto",
   },
 
@@ -602,12 +665,6 @@ const styles: any = {
   features: {
     padding: "80px 24px",
     background: "linear-gradient(180deg,#0f172a,#1e293b)",
-  },
-
-  pricing: {
-    padding: "80px 24px",
-    background: "#f8fafc",
-    color: "#0f172a",
   },
 
   sectionTitle: {
@@ -630,20 +687,5 @@ const styles: any = {
     borderRadius: 26,
     fontWeight: 900,
     border: "1px solid rgba(255,255,255,0.14)",
-  },
-
-  priceCard: {
-    background: "white",
-    padding: 28,
-    borderRadius: 28,
-    boxShadow: "0 20px 60px rgba(15,23,42,0.08)",
-  },
-
-  priceCardPro: {
-    background: "linear-gradient(135deg,#7c3aed,#2563eb)",
-    color: "white",
-    padding: 28,
-    borderRadius: 28,
-    boxShadow: "0 24px 80px rgba(37,99,235,0.25)",
   },
 };
