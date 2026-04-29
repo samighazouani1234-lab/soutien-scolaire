@@ -4,10 +4,14 @@ export async function POST(req: Request) {
   try {
     const { question } = await req.json();
 
-    const response = await fetch("https://api.together.xyz/v1/chat/completions", {
+    if (!question) {
+      return NextResponse.json({ answer: "Question manquante." });
+    }
+
+    const res = await fetch("https://api.together.xyz/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.TOGETHER_API_KEY}`,
+        Authorization: `Bearer ${process.env.TOGETHER_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -15,29 +19,8 @@ export async function POST(req: Request) {
         messages: [
           {
             role: "system",
-            content: `
-Tu es un professeur de soutien scolaire en France.
-
-Tu dois toujours répondre avec cette structure :
-
-1. 📘 COURS DÉTAILLÉ
-- Explication claire
-- Définitions
-- Méthode
-
-2. ✏️ EXERCICES
-- 3 exercices (facile, moyen, difficile)
-
-3. ✅ CORRECTIONS
-- Corriger chaque exercice
-
-4. 🎓 ÉVALUATION
-- 4 questions
-
-5. 📊 BARÈME SUR 10
-
-Style simple, pédagogique, niveau collège/lycée.
-`,
+            content:
+              "Tu es un excellent professeur français. Tu crées des cours scolaires clairs, complets, structurés, avec exercices et corrections.",
           },
           {
             role: "user",
@@ -45,23 +28,24 @@ Style simple, pédagogique, niveau collège/lycée.
           },
         ],
         temperature: 0.7,
-        max_tokens: 2000,
+        max_tokens: 3500,
       }),
     });
 
-    const data = await response.json();
+    const data = await res.json();
+
+    if (!res.ok) {
+      return NextResponse.json({
+        answer: data?.error?.message || "Erreur Together AI.",
+      });
+    }
 
     return NextResponse.json({
-      answer:
-        data.choices?.[0]?.message?.content ||
-        data.error?.message ||
-        "Erreur IA",
+      answer: data.choices?.[0]?.message?.content || "Aucune réponse IA.",
     });
-
-  } catch (error) {
-    return NextResponse.json(
-      { answer: "Erreur serveur IA." },
-      { status: 500 }
-    );
+  } catch {
+    return NextResponse.json({
+      answer: "Erreur serveur IA.",
+    });
   }
 }
