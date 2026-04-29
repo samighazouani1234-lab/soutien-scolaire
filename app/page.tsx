@@ -6,6 +6,7 @@ import { getSupabaseClient } from "../lib/supabase";
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -40,7 +41,6 @@ export default function Home() {
     if (!matiere) return [];
     const selected = (data as any)[matiere];
     if (!selected) return [];
-
     return Object.values(selected).flatMap((cat: any) => Object.keys(cat));
   }, [matiere]);
 
@@ -74,15 +74,28 @@ export default function Home() {
 
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { data: signupData, error } = await supabase.auth.signUp({
       email: cleanEmail,
       password,
     });
 
-    setLoading(false);
+    if (error) {
+      setLoading(false);
+      alert(error.message);
+      return;
+    }
 
-    if (error) alert(error.message);
-    else alert("Compte créé. Tu peux maintenant te connecter.");
+    if (signupData.user) {
+      await supabase.from("profiles").upsert([
+        {
+          id: signupData.user.id,
+          email: signupData.user.email,
+        },
+      ]);
+    }
+
+    setLoading(false);
+    alert("Compte créé. Tu peux maintenant te connecter.");
   }
 
   async function handleLogin() {
@@ -98,15 +111,30 @@ export default function Home() {
 
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data: loginData, error } = await supabase.auth.signInWithPassword({
       email: cleanEmail,
       password,
     });
 
-    setLoading(false);
+    if (error) {
+      setLoading(false);
+      alert(error.message);
+      return;
+    }
 
-    if (error) alert(error.message);
-    else alert("Connexion réussie");
+    if (loginData.user) {
+      await supabase.from("profiles").upsert([
+        {
+          id: loginData.user.id,
+          email: loginData.user.email,
+        },
+      ]);
+
+      setUser(loginData.user);
+    }
+
+    setLoading(false);
+    alert("Connexion réussie");
   }
 
   async function handleLogout() {
@@ -149,9 +177,7 @@ Ajoute :
     try {
       const res = await fetch("/api/ia", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question }),
       });
 
@@ -209,9 +235,7 @@ Ajoute :
     try {
       const res = await fetch("/api/ia", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question }),
       });
 
@@ -245,26 +269,17 @@ Ajoute :
           <div style={styles.logo}>🤖 EduAI</div>
 
           <div style={styles.navLinks}>
-            <a href="#write" style={styles.writeButton}>
-              ✍️ Écrire un cours
-            </a>
-
-            <a href="#generate" style={styles.link}>
-              Générateur
-            </a>
-
-            <a href="#features" style={styles.link}>
-              Avantages
-            </a>
+            <a href="#write" style={styles.writeButton}>✍️ Écrire un cours</a>
+            <a href="#generate" style={styles.link}>Générateur</a>
+            <a href="#features" style={styles.link}>Avantages</a>
+            <a href="/dashboard" style={styles.link}>Dashboard</a>
 
             {user ? (
               <button onClick={handleLogout} style={styles.navButton}>
                 Déconnexion
               </button>
             ) : (
-              <a href="#login" style={styles.cta}>
-                Connexion
-              </a>
+              <a href="#login" style={styles.cta}>Connexion</a>
             )}
           </div>
         </nav>
@@ -328,7 +343,7 @@ Ajoute :
 
                   <textarea
                     style={styles.textarea}
-                    placeholder="Ex : Les limites en Terminale, les fractions en 5e, la mécanique en MPSI..."
+                    placeholder="Ex : Les fractions en 5e, les limites en Terminale, la mécanique en MPSI..."
                     value={customTopic}
                     onChange={(e) => setCustomTopic(e.target.value)}
                   />
@@ -352,9 +367,7 @@ Ajoute :
                   >
                     <option value="">Choisir une matière</option>
                     {Object.keys(data).map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
+                      <option key={m} value={m}>{m}</option>
                     ))}
                   </select>
 
@@ -368,9 +381,7 @@ Ajoute :
                   >
                     <option value="">Choisir un niveau</option>
                     {niveaux.map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
+                      <option key={n} value={n}>{n}</option>
                     ))}
                   </select>
 
@@ -381,9 +392,7 @@ Ajoute :
                   >
                     <option value="">Choisir un chapitre</option>
                     {chapitres.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
+                      <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
 
@@ -689,6 +698,3 @@ const styles: any = {
     border: "1px solid rgba(255,255,255,0.14)",
   },
 };
-<a href="/dashboard" style={styles.link}>
-  Dashboard
-</a>
