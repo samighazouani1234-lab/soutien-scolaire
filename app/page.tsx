@@ -1,17 +1,128 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { data } from "../data/courses";
+import { getSupabaseClient } from "../lib/supabase";
 
 export default function Home() {
+  const [user, setUser] = useState<any>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
   const [matiere, setMatiere] = useState("");
   const [niveau, setNiveau] = useState("");
   const [chapitre, setChapitre] = useState("");
+
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user || null);
+      }
+    );
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  const niveaux = useMemo(() => {
+    if (!matiere) return [];
+    const selected = (data as any)[matiere];
+    if (!selected) return [];
+
+    return Object.values(selected).flatMap((category: any) =>
+      Object.keys(category)
+    );
+  }, [matiere]);
+
+  const chapitres = useMemo(() => {
+    if (!matiere || !niveau) return [];
+    const selected = (data as any)[matiere];
+    if (!selected) return [];
+
+    for (const category in selected) {
+      if (selected[category][niveau]) {
+        return selected[category][niveau];
+      }
+    }
+
+    return [];
+  }, [matiere, niveau]);
+
+  async function handleSignup() {
+    const supabase = getSupabaseClient();
+    if (!supabase) return alert("Erreur Supabase");
+
+    if (!email.trim() || !password) {
+      alert("Entre un email et un mot de passe");
+      return;
+    }
+
+    if (password.length < 6) {
+      alert("Mot de passe minimum 6 caractères");
+      return;
+    }
+
+    setLoading(true);
+
+    const { error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+    });
+
+    setLoading(false);
+
+    if (error) alert(error.message);
+    else alert("Compte créé. Tu peux te connecter.");
+  }
+
+  async function handleLogin() {
+    const supabase = getSupabaseClient();
+    if (!supabase) return alert("Erreur Supabase");
+
+    if (!email.trim() || !password) {
+      alert("Entre un email et un mot de passe");
+      return;
+    }
+
+    setLoading(true);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    setLoading(false);
+
+    if (error) alert(error.message);
+    else setUser(data.user);
+  }
+
+  async function handleLogout() {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    await supabase.auth.signOut();
+    setUser(null);
+    setAnswer("");
+  }
+
   async function generateCourse() {
+    if (!user) {
+      alert("Connecte-toi pour générer un cours");
+      return;
+    }
+
     if (!matiere || !niveau || !chapitre) {
-      alert("Remplis tous les champs");
+      alert("Choisis matière, niveau et chapitre");
       return;
     }
 
@@ -19,32 +130,39 @@ export default function Home() {
     setAnswer("");
 
     const question = `
-Crée un cours PREMIUM.
+Crée un cours scolaire premium.
 
 Matière : ${matiere}
 Niveau : ${niveau}
 Chapitre : ${chapitre}
 
-Structure :
-1. Objectifs
+Structure obligatoire :
+1. Objectifs du chapitre
 2. Cours détaillé
-3. Définitions
-4. Méthode
+3. Définitions importantes
+4. Méthode étape par étape
 5. Exemples corrigés
-6. Exercices
-7. Corrections
-8. Évaluation /20
-9. Résumé
+6. Exercices progressifs
+7. Corrections détaillées
+8. Évaluation finale avec barème sur 20
+9. Résumé à retenir
 `;
 
-    const res = await fetch("/api/ia", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question }),
-    });
+    try {
+      const res = await fetch("/api/ia", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ question })
+      });
 
-    const json = await res.json();
-    setAnswer(json.answer || "Erreur IA");
+      const json = await res.json();
+      setAnswer(json.answer || "Erreur IA");
+    } catch {
+      setAnswer("Erreur serveur IA.");
+    }
+
     setLoading(false);
   }
 
@@ -75,47 +193,113 @@ Structure :
         <section style={styles.hero} className="no-print">
           <nav style={styles.nav}>
             <div style={styles.logo}>🎓 EduAI</div>
-            <a href="#generate" style={styles.navButton}>Commencer</a>
+
+            <div style={styles.navLinks}>
+              <a href="#generator" style={styles.link}>Générateur</a>
+
+              {user ? (
+                <button onClick={handleLogout} style={styles.logout}>
+                  Déconnexion
+                </button>
+              ) : (
+                <a href="#login" style={styles.navButton}>Connexion</a>
+              )}
+            </div>
           </nav>
 
           <div style={styles.grid}>
             <div>
               <span style={styles.badge}>IA scolaire premium</span>
+
               <h1 style={styles.title}>
                 Génère des cours haut de gamme avec l’IA.
               </h1>
+
               <p style={styles.subtitle}>
                 Cours détaillés, exercices corrigés, évaluations et export PDF.
               </p>
             </div>
 
-            <div id="generate" style={styles.card}>
-              <h2>Créer un cours</h2>
+            <div id="login" style={styles.card}>
+              {!user ? (
+                <>
+                  <h2 style={styles.cardTitle}>Connexion</h2>
 
-              <select style={styles.input} onChange={(e) => setMatiere(e.target.value)}>
-                <option value="">Matière</option>
-                <option>Mathématiques</option>
-                <option>Physique</option>
-                <option>Chimie</option>
-              </select>
+                  <input
+                    style={styles.input}
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
 
-              <select style={styles.input} onChange={(e) => setNiveau(e.target.value)}>
-                <option value="">Niveau</option>
-                <option>Collège</option>
-                <option>Lycée</option>
-                <option>Prépa</option>
-                <option>Grandes écoles</option>
-              </select>
+                  <input
+                    style={styles.input}
+                    type="password"
+                    placeholder="Mot de passe"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
 
-              <input
-                style={styles.input}
-                placeholder="Chapitre"
-                onChange={(e) => setChapitre(e.target.value)}
-              />
+                  <button onClick={handleLogin} style={styles.button}>
+                    {loading ? "Connexion..." : "Se connecter"}
+                  </button>
 
-              <button onClick={generateCourse} style={styles.button}>
-                {loading ? "Génération..." : "✨ Générer le cours"}
-              </button>
+                  <button onClick={handleSignup} style={styles.secondaryButton}>
+                    Créer un compte
+                  </button>
+                </>
+              ) : (
+                <div id="generator">
+                  <p style={styles.connected}>Connecté : {user.email}</p>
+
+                  <h2 style={styles.cardTitle}>Créer un cours</h2>
+
+                  <select
+                    style={styles.input}
+                    value={matiere}
+                    onChange={(e) => {
+                      setMatiere(e.target.value);
+                      setNiveau("");
+                      setChapitre("");
+                    }}
+                  >
+                    <option value="">Choisir une matière</option>
+                    {Object.keys(data).map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    style={styles.input}
+                    value={niveau}
+                    onChange={(e) => {
+                      setNiveau(e.target.value);
+                      setChapitre("");
+                    }}
+                  >
+                    <option value="">Choisir un niveau</option>
+                    {niveaux.map((n: any) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    style={styles.input}
+                    value={chapitre}
+                    onChange={(e) => setChapitre(e.target.value)}
+                  >
+                    <option value="">Choisir un chapitre</option>
+                    {chapitres.map((c: any) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+
+                  <button onClick={generateCourse} style={styles.button}>
+                    {loading ? "Génération..." : "✨ Générer le cours"}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -161,7 +345,20 @@ const styles: any = {
     justifyContent: "space-between",
     alignItems: "center",
   },
-  logo: { fontSize: 28, fontWeight: 900 },
+  logo: {
+    fontSize: 28,
+    fontWeight: 900,
+  },
+  navLinks: {
+    display: "flex",
+    gap: 16,
+    alignItems: "center",
+  },
+  link: {
+    color: "white",
+    textDecoration: "none",
+    fontWeight: 900,
+  },
   navButton: {
     background: "white",
     color: "#020617",
@@ -169,6 +366,15 @@ const styles: any = {
     borderRadius: 999,
     fontWeight: 900,
     textDecoration: "none",
+  },
+  logout: {
+    background: "#ef4444",
+    color: "white",
+    padding: "12px 20px",
+    borderRadius: 999,
+    border: "none",
+    fontWeight: 900,
+    cursor: "pointer",
   },
   grid: {
     maxWidth: 1200,
@@ -202,6 +408,10 @@ const styles: any = {
     borderRadius: 34,
     boxShadow: "0 35px 100px rgba(0,0,0,0.45)",
   },
+  cardTitle: {
+    fontSize: 30,
+    marginTop: 0,
+  },
   input: {
     width: "100%",
     padding: 16,
@@ -220,6 +430,24 @@ const styles: any = {
     color: "white",
     fontWeight: 900,
     cursor: "pointer",
+  },
+  secondaryButton: {
+    width: "100%",
+    marginTop: 12,
+    padding: 17,
+    border: "none",
+    borderRadius: 18,
+    background: "#0f172a",
+    color: "white",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+  connected: {
+    background: "#dcfce7",
+    color: "#166534",
+    padding: 12,
+    borderRadius: 14,
+    fontWeight: 900,
   },
   resultWrap: {
     maxWidth: 1000,
