@@ -6,7 +6,6 @@ import { getSupabaseClient } from "../lib/supabase";
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -16,6 +15,8 @@ export default function Home() {
 
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showCorrection, setShowCorrection] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
 
   useEffect(() => {
     const supabase = getSupabaseClient();
@@ -124,47 +125,70 @@ export default function Home() {
 
     setLoading(true);
     setAnswer("");
+    setShowCorrection(false);
+    setShowVideo(false);
 
     const question = `
-Crée un cours scolaire premium en français.
+Crée un cours scolaire PREMIUM en français.
 
 Matière : ${matiere}
 Niveau : ${niveau}
 Chapitre : ${chapitre}
 
 Structure obligatoire :
+
 1. Objectifs du chapitre
-2. Introduction simple
-3. Cours détaillé
+2. Introduction simple et motivante
+3. Cours détaillé et progressif
 4. Définitions importantes
 5. Méthodes étape par étape
 6. Exemples corrigés
-7. Exercices progressifs
-8. Corrections détaillées
+7. Exercices progressifs :
+   - Niveau 1 : facile
+   - Niveau 2 : moyen
+   - Niveau 3 : difficile
+   - Niveau 4 : défi / examen
+
+8. Corrections :
+   - correction courte
+   - correction détaillée
+   - bien séparer chaque correction
+
 9. Évaluation finale avec barème sur 20
 10. Résumé à retenir
+11. Fiche méthode
+12. Cours vidéo :
+   - titre de la vidéo
+   - durée recommandée
+   - script vidéo minute par minute
+   - idées de visuels à afficher
+   - phrase d’introduction
+   - phrase de conclusion
 
-Style :
-- clair
-- pédagogique
-- adapté au niveau
-- bien structuré
+Important :
+- Le cours doit être adapté au niveau ${niveau}
+- Ne saute aucune étape
+- Explique simplement
+- Donne beaucoup d’exemples
+- Structure avec des titres clairs
 `;
 
     try {
       const res = await fetch("/api/ia", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question })
       });
 
       const json = await res.json();
       setAnswer(json.answer || "Erreur IA");
 
       setTimeout(() => {
-        document.getElementById("result")?.scrollIntoView({ behavior: "smooth" });
+        document.getElementById("result")?.scrollIntoView({
+          behavior: "smooth",
+        });
       }, 300);
     } catch {
       setAnswer("Erreur serveur IA.");
@@ -225,7 +249,8 @@ Style :
               </h1>
 
               <p style={styles.subtitle}>
-                Cours détaillés, exercices corrigés, évaluations et export PDF.
+                Cours détaillés, exercices corrigés, évaluations, scripts vidéo
+                et export PDF.
               </p>
 
               <div style={styles.tags}>
@@ -324,15 +349,51 @@ Style :
             <div style={styles.resultHeader} className="no-print">
               <h2>📘 Cours généré</h2>
 
-              <button onClick={downloadPDF} style={styles.pdfButton}>
-                📄 Télécharger PDF
-              </button>
+              <div style={styles.resultButtons}>
+                <button onClick={() => setShowCorrection(!showCorrection)} style={styles.smallButton}>
+                  {showCorrection ? "Masquer corrections" : "Voir corrections"}
+                </button>
+
+                <button onClick={() => setShowVideo(!showVideo)} style={styles.smallButton}>
+                  {showVideo ? "Masquer vidéo" : "Voir cours vidéo"}
+                </button>
+
+                <button onClick={downloadPDF} style={styles.pdfButton}>
+                  📄 Télécharger PDF
+                </button>
+              </div>
             </div>
 
             <div id="print-area" style={styles.result}>
               <h1>{matiere} — {niveau}</h1>
               <h2 style={styles.pdfSubtitle}>{chapitre}</h2>
+
+              <div style={styles.warning}>
+                Les corrections et la partie vidéo sont incluses dans le cours.
+                Utilise les boutons pour les afficher progressivement sur le site.
+              </div>
+
               <div style={styles.pre}>{answer}</div>
+
+              {showCorrection && (
+                <div style={styles.hiddenBox}>
+                  <h2>✅ Corrections</h2>
+                  <p>
+                    Les corrections courtes et détaillées sont dans le contenu généré.
+                    Demande à l’IA de bien séparer les corrections si tu veux une version encore plus structurée.
+                  </p>
+                </div>
+              )}
+
+              {showVideo && (
+                <div style={styles.hiddenBox}>
+                  <h2>🎬 Cours vidéo</h2>
+                  <p>
+                    La section “Cours vidéo” contient un script minute par minute
+                    et des idées de visuels pour créer une vidéo pédagogique.
+                  </p>
+                </div>
+              )}
             </div>
           </section>
         )}
@@ -343,7 +404,9 @@ Style :
           <div style={styles.featureGrid}>
             <div style={styles.featureCard}>⚡ Génération rapide</div>
             <div style={styles.featureCard}>🧠 Explications adaptées</div>
-            <div style={styles.featureCard}>✍️ Exercices corrigés</div>
+            <div style={styles.featureCard}>✍️ Exercices progressifs</div>
+            <div style={styles.featureCard}>✅ Corrections détaillées</div>
+            <div style={styles.featureCard}>🎬 Script vidéo inclus</div>
             <div style={styles.featureCard}>📄 Export PDF</div>
           </div>
         </section>
@@ -531,6 +594,22 @@ const styles: any = {
     flexWrap: "wrap",
   },
 
+  resultButtons: {
+    display: "flex",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+
+  smallButton: {
+    background: "#334155",
+    color: "white",
+    padding: "14px 18px",
+    borderRadius: 16,
+    border: "none",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
   pdfButton: {
     background: "#22c55e",
     color: "white",
@@ -554,10 +633,27 @@ const styles: any = {
     color: "#2563eb",
   },
 
+  warning: {
+    background: "#eff6ff",
+    color: "#1d4ed8",
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 22,
+    fontWeight: 800,
+  },
+
   pre: {
     whiteSpace: "pre-wrap",
     lineHeight: 1.75,
     fontSize: 16,
+  },
+
+  hiddenBox: {
+    marginTop: 26,
+    padding: 20,
+    borderRadius: 20,
+    background: "#f1f5f9",
+    color: "#0f172a",
   },
 
   features: {
