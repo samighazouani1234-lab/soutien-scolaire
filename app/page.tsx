@@ -6,6 +6,7 @@ import { getSupabaseClient } from "../lib/supabase";
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -37,10 +38,7 @@ export default function Home() {
     if (!matiere) return [];
     const selected = (data as any)[matiere];
     if (!selected) return [];
-
-    return Object.values(selected).flatMap((category: any) =>
-      Object.keys(category)
-    );
+    return Object.values(selected).flatMap((cat: any) => Object.keys(cat));
   }, [matiere]);
 
   const chapitres = useMemo(() => {
@@ -48,10 +46,8 @@ export default function Home() {
     const selected = (data as any)[matiere];
     if (!selected) return [];
 
-    for (const category in selected) {
-      if (selected[category][niveau]) {
-        return selected[category][niveau];
-      }
+    for (const cat in selected) {
+      if (selected[cat][niveau]) return selected[cat][niveau];
     }
 
     return [];
@@ -81,7 +77,7 @@ export default function Home() {
     setLoading(false);
 
     if (error) alert(error.message);
-    else alert("Compte créé. Tu peux te connecter.");
+    else alert("Compte créé. Tu peux maintenant te connecter.");
   }
 
   async function handleLogin() {
@@ -130,7 +126,7 @@ export default function Home() {
     setAnswer("");
 
     const question = `
-Crée un cours scolaire premium.
+Crée un cours scolaire premium en français.
 
 Matière : ${matiere}
 Niveau : ${niveau}
@@ -138,27 +134,38 @@ Chapitre : ${chapitre}
 
 Structure obligatoire :
 1. Objectifs du chapitre
-2. Cours détaillé
-3. Définitions importantes
-4. Méthode étape par étape
-5. Exemples corrigés
-6. Exercices progressifs
-7. Corrections détaillées
-8. Évaluation finale avec barème sur 20
-9. Résumé à retenir
+2. Introduction simple
+3. Cours détaillé
+4. Définitions importantes
+5. Méthodes étape par étape
+6. Exemples corrigés
+7. Exercices progressifs
+8. Corrections détaillées
+9. Évaluation finale avec barème sur 20
+10. Résumé à retenir
+
+Style :
+- clair
+- pédagogique
+- adapté au niveau
+- bien structuré
 `;
 
     try {
       const res = await fetch("/api/ia", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ question })
+        body: JSON.stringify({ question }),
       });
 
       const json = await res.json();
       setAnswer(json.answer || "Erreur IA");
+
+      setTimeout(() => {
+        document.getElementById("result")?.scrollIntoView({ behavior: "smooth" });
+      }, 300);
     } catch {
       setAnswer("Erreur serveur IA.");
     }
@@ -167,6 +174,7 @@ Structure obligatoire :
   }
 
   function downloadPDF() {
+    document.title = `Cours-${matiere}-${chapitre}`;
     window.print();
   }
 
@@ -181,8 +189,8 @@ Structure obligatoire :
             left: 0;
             top: 0;
             width: 100%;
-            background: white;
-            color: black;
+            background: white !important;
+            color: black !important;
             padding: 40px;
           }
           .no-print { display: none !important; }
@@ -196,6 +204,7 @@ Structure obligatoire :
 
             <div style={styles.navLinks}>
               <a href="#generator" style={styles.link}>Générateur</a>
+              <a href="#features" style={styles.link}>Avantages</a>
 
               {user ? (
                 <button onClick={handleLogout} style={styles.logout}>
@@ -209,7 +218,7 @@ Structure obligatoire :
 
           <div style={styles.grid}>
             <div>
-              <span style={styles.badge}>IA scolaire premium</span>
+              <span style={styles.badge}>✨ IA scolaire premium</span>
 
               <h1 style={styles.title}>
                 Génère des cours haut de gamme avec l’IA.
@@ -218,12 +227,18 @@ Structure obligatoire :
               <p style={styles.subtitle}>
                 Cours détaillés, exercices corrigés, évaluations et export PDF.
               </p>
+
+              <div style={styles.tags}>
+                <span style={styles.tag}>🎓 Collège → Prépa</span>
+                <span style={styles.tag}>📚 Maths · Physique · Chimie</span>
+                <span style={styles.tag}>📄 PDF exportable</span>
+              </div>
             </div>
 
             <div id="login" style={styles.card}>
               {!user ? (
                 <>
-                  <h2 style={styles.cardTitle}>Connexion</h2>
+                  <h2 style={styles.cardTitle}>🔐 Connexion</h2>
 
                   <input
                     style={styles.input}
@@ -251,7 +266,7 @@ Structure obligatoire :
                 </>
               ) : (
                 <div id="generator">
-                  <p style={styles.connected}>Connecté : {user.email}</p>
+                  <p style={styles.connected}>✅ Connecté : {user.email}</p>
 
                   <h2 style={styles.cardTitle}>Créer un cours</h2>
 
@@ -296,7 +311,7 @@ Structure obligatoire :
                   </select>
 
                   <button onClick={generateCourse} style={styles.button}>
-                    {loading ? "Génération..." : "✨ Générer le cours"}
+                    {loading ? "Génération en cours..." : "✨ Générer le cours"}
                   </button>
                 </div>
               )}
@@ -305,9 +320,10 @@ Structure obligatoire :
         </section>
 
         {answer && (
-          <section style={styles.resultWrap}>
+          <section id="result" style={styles.resultWrap}>
             <div style={styles.resultHeader} className="no-print">
               <h2>📘 Cours généré</h2>
+
               <button onClick={downloadPDF} style={styles.pdfButton}>
                 📄 Télécharger PDF
               </button>
@@ -315,11 +331,22 @@ Structure obligatoire :
 
             <div id="print-area" style={styles.result}>
               <h1>{matiere} — {niveau}</h1>
-              <h2 style={{ color: "#2563eb" }}>{chapitre}</h2>
-              <pre style={styles.pre}>{answer}</pre>
+              <h2 style={styles.pdfSubtitle}>{chapitre}</h2>
+              <div style={styles.pre}>{answer}</div>
             </div>
           </section>
         )}
+
+        <section id="features" style={styles.features} className="no-print">
+          <h2 style={styles.sectionTitle}>Pourquoi EduAI ?</h2>
+
+          <div style={styles.featureGrid}>
+            <div style={styles.featureCard}>⚡ Génération rapide</div>
+            <div style={styles.featureCard}>🧠 Explications adaptées</div>
+            <div style={styles.featureCard}>✍️ Exercices corrigés</div>
+            <div style={styles.featureCard}>📄 Export PDF</div>
+          </div>
+        </section>
       </main>
     </>
   );
@@ -332,33 +359,41 @@ const styles: any = {
     color: "white",
     fontFamily: "Arial, sans-serif",
   },
+
   hero: {
     minHeight: "100vh",
     padding: 28,
     background:
       "radial-gradient(circle at top left,#22d3ee55,transparent 30%), radial-gradient(circle at top right,#a855f755,transparent 30%), linear-gradient(135deg,#020617,#0f172a)",
   },
+
   nav: {
     maxWidth: 1200,
     margin: "0 auto",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
+    padding: "18px 0",
   },
+
   logo: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: 900,
   },
+
   navLinks: {
     display: "flex",
-    gap: 16,
+    gap: 18,
     alignItems: "center",
+    flexWrap: "wrap",
   },
+
   link: {
-    color: "white",
+    color: "#e0f2fe",
     textDecoration: "none",
     fontWeight: 900,
   },
+
   navButton: {
     background: "white",
     color: "#020617",
@@ -367,6 +402,7 @@ const styles: any = {
     fontWeight: 900,
     textDecoration: "none",
   },
+
   logout: {
     background: "#ef4444",
     color: "white",
@@ -376,6 +412,7 @@ const styles: any = {
     fontWeight: 900,
     cursor: "pointer",
   },
+
   grid: {
     maxWidth: 1200,
     margin: "90px auto",
@@ -384,34 +421,58 @@ const styles: any = {
     gap: 50,
     alignItems: "center",
   },
+
   badge: {
+    display: "inline-block",
     background: "rgba(255,255,255,0.12)",
     padding: "10px 16px",
     borderRadius: 999,
     color: "#a5f3fc",
     fontWeight: 900,
   },
+
   title: {
     fontSize: "clamp(48px,8vw,82px)",
     lineHeight: 1,
     letterSpacing: -3,
+    margin: "28px 0",
   },
+
   subtitle: {
     fontSize: 21,
     color: "#cbd5e1",
     lineHeight: 1.6,
+    maxWidth: 650,
   },
+
+  tags: {
+    display: "flex",
+    gap: 14,
+    flexWrap: "wrap",
+    marginTop: 30,
+  },
+
+  tag: {
+    background: "rgba(255,255,255,0.12)",
+    border: "1px solid rgba(255,255,255,0.16)",
+    padding: "14px 18px",
+    borderRadius: 18,
+    fontWeight: 900,
+  },
+
   card: {
-    background: "rgba(255,255,255,0.95)",
+    background: "rgba(255,255,255,0.96)",
     color: "#0f172a",
-    padding: 32,
+    padding: 34,
     borderRadius: 34,
     boxShadow: "0 35px 100px rgba(0,0,0,0.45)",
   },
+
   cardTitle: {
     fontSize: 30,
     marginTop: 0,
   },
+
   input: {
     width: "100%",
     padding: 16,
@@ -419,7 +480,9 @@ const styles: any = {
     borderRadius: 16,
     border: "1px solid #cbd5e1",
     boxSizing: "border-box",
+    fontSize: 16,
   },
+
   button: {
     width: "100%",
     marginTop: 20,
@@ -430,7 +493,9 @@ const styles: any = {
     color: "white",
     fontWeight: 900,
     cursor: "pointer",
+    fontSize: 16,
   },
+
   secondaryButton: {
     width: "100%",
     marginTop: 12,
@@ -441,7 +506,9 @@ const styles: any = {
     color: "white",
     fontWeight: 900,
     cursor: "pointer",
+    fontSize: 16,
   },
+
   connected: {
     background: "#dcfce7",
     color: "#166534",
@@ -449,17 +516,21 @@ const styles: any = {
     borderRadius: 14,
     fontWeight: 900,
   },
+
   resultWrap: {
-    maxWidth: 1000,
+    maxWidth: 1050,
     margin: "0 auto",
-    padding: 32,
+    padding: "60px 32px",
   },
+
   resultHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     gap: 20,
+    flexWrap: "wrap",
   },
+
   pdfButton: {
     background: "#22c55e",
     color: "white",
@@ -469,16 +540,49 @@ const styles: any = {
     fontWeight: 900,
     cursor: "pointer",
   },
+
   result: {
     background: "white",
     color: "#0f172a",
-    padding: 32,
-    borderRadius: 26,
+    padding: 36,
+    borderRadius: 28,
     marginTop: 20,
+    boxShadow: "0 25px 80px rgba(0,0,0,0.28)",
   },
+
+  pdfSubtitle: {
+    color: "#2563eb",
+  },
+
   pre: {
     whiteSpace: "pre-wrap",
-    lineHeight: 1.7,
-    fontFamily: "Arial, sans-serif",
+    lineHeight: 1.75,
+    fontSize: 16,
+  },
+
+  features: {
+    padding: "80px 24px",
+    background: "linear-gradient(180deg,#020617,#0f172a)",
+  },
+
+  sectionTitle: {
+    textAlign: "center",
+    fontSize: "clamp(34px,5vw,54px)",
+  },
+
+  featureGrid: {
+    maxWidth: 1100,
+    margin: "40px auto 0",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
+    gap: 20,
+  },
+
+  featureCard: {
+    background: "rgba(255,255,255,0.09)",
+    border: "1px solid rgba(255,255,255,0.14)",
+    padding: 26,
+    borderRadius: 24,
+    fontWeight: 900,
   },
 };
