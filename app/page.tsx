@@ -15,7 +15,11 @@ export default function Home() {
 
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showCorrection, setShowCorrection] = useState(false);
+
+  const [showQuiz, setShowQuiz] = useState(true);
+  const [showExercises, setShowExercises] = useState(true);
+  const [showShortCorrections, setShowShortCorrections] = useState(false);
+  const [showDetailedCorrections, setShowDetailedCorrections] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
 
   useEffect(() => {
@@ -32,7 +36,9 @@ export default function Home() {
       }
     );
 
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   const niveaux = useMemo(() => {
@@ -53,6 +59,12 @@ export default function Home() {
 
     return [];
   }, [matiere, niveau]);
+
+  function getSection(title: string) {
+    if (!answer) return "";
+    const regex = new RegExp(`### ${title}([\\s\\S]*?)(?=### |$)`);
+    return answer.match(regex)?.[1]?.trim() || "";
+  }
 
   async function handleSignup() {
     const supabase = getSupabaseClient();
@@ -125,7 +137,10 @@ export default function Home() {
 
     setLoading(true);
     setAnswer("");
-    setShowCorrection(false);
+    setShowQuiz(true);
+    setShowExercises(true);
+    setShowShortCorrections(false);
+    setShowDetailedCorrections(false);
     setShowVideo(false);
 
     const question = `
@@ -135,35 +150,46 @@ Matière : ${matiere}
 Niveau : ${niveau}
 Chapitre : ${chapitre}
 
-Structure obligatoire :
+Réponds obligatoirement avec ces séparateurs exacts :
 
+### COURS
 1. Objectifs du chapitre
 2. Introduction simple et motivante
 3. Cours détaillé et progressif
 4. Définitions importantes
 5. Méthodes étape par étape
 6. Exemples corrigés
-7. Exercices progressifs :
-   - Niveau 1 : facile
-   - Niveau 2 : moyen
-   - Niveau 3 : difficile
-   - Niveau 4 : défi / examen
+7. Résumé à retenir
+8. Fiche méthode
 
-8. Corrections :
-   - correction courte
-   - correction détaillée
-   - bien séparer chaque correction
+### QUIZ_AUTOMATISE
+Crée 10 questions progressives.
+Pour chaque question :
+- question
+- choix A/B/C/D si possible
+- bonne réponse indiquée clairement
 
-9. Évaluation finale avec barème sur 20
-10. Résumé à retenir
-11. Fiche méthode
-12. Cours vidéo :
-   - titre de la vidéo
-   - durée recommandée
-   - script vidéo minute par minute
-   - idées de visuels à afficher
-   - phrase d’introduction
-   - phrase de conclusion
+### EXERCICES_PROGRESSIFS
+Crée des exercices :
+- Niveau 1 : facile
+- Niveau 2 : moyen
+- Niveau 3 : difficile
+- Niveau 4 : défi / examen
+
+### CORRECTIONS_COURTES
+Donne les corrections courtes de tous les exercices et quiz.
+
+### CORRECTIONS_DETAILLEES
+Donne les corrections détaillées étape par étape de tous les exercices.
+
+### COURS_VIDEO
+Crée une proposition de cours vidéo :
+- titre de la vidéo
+- durée recommandée
+- script minute par minute
+- idées de visuels à afficher
+- phrase d’introduction
+- phrase de conclusion
 
 Important :
 - Le cours doit être adapté au niveau ${niveau}
@@ -177,9 +203,9 @@ Important :
       const res = await fetch("/api/ia", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ question })
+        body: JSON.stringify({ question }),
       });
 
       const json = await res.json();
@@ -227,15 +253,21 @@ Important :
             <div style={styles.logo}>🎓 EduAI</div>
 
             <div style={styles.navLinks}>
-              <a href="#generator" style={styles.link}>Générateur</a>
-              <a href="#features" style={styles.link}>Avantages</a>
+              <a href="#generator" style={styles.link}>
+                Générateur
+              </a>
+              <a href="#features" style={styles.link}>
+                Avantages
+              </a>
 
               {user ? (
                 <button onClick={handleLogout} style={styles.logout}>
                   Déconnexion
                 </button>
               ) : (
-                <a href="#login" style={styles.navButton}>Connexion</a>
+                <a href="#login" style={styles.navButton}>
+                  Connexion
+                </a>
               )}
             </div>
           </nav>
@@ -249,8 +281,8 @@ Important :
               </h1>
 
               <p style={styles.subtitle}>
-                Cours détaillés, exercices corrigés, évaluations, scripts vidéo
-                et export PDF.
+                Cours détaillés, quiz automatiques, exercices progressifs,
+                corrections cachées, scripts vidéo et export PDF.
               </p>
 
               <div style={styles.tags}>
@@ -306,7 +338,9 @@ Important :
                   >
                     <option value="">Choisir une matière</option>
                     {Object.keys(data).map((m) => (
-                      <option key={m} value={m}>{m}</option>
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
                     ))}
                   </select>
 
@@ -320,7 +354,9 @@ Important :
                   >
                     <option value="">Choisir un niveau</option>
                     {niveaux.map((n: any) => (
-                      <option key={n} value={n}>{n}</option>
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
                     ))}
                   </select>
 
@@ -331,7 +367,9 @@ Important :
                   >
                     <option value="">Choisir un chapitre</option>
                     {chapitres.map((c: any) => (
-                      <option key={c} value={c}>{c}</option>
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
                     ))}
                   </select>
 
@@ -350,12 +388,45 @@ Important :
               <h2>📘 Cours généré</h2>
 
               <div style={styles.resultButtons}>
-                <button onClick={() => setShowCorrection(!showCorrection)} style={styles.smallButton}>
-                  {showCorrection ? "Masquer corrections" : "Voir corrections"}
+                <button
+                  onClick={() => setShowQuiz(!showQuiz)}
+                  style={styles.smallButton}
+                >
+                  {showQuiz ? "Masquer quiz" : "Voir quiz"}
                 </button>
 
-                <button onClick={() => setShowVideo(!showVideo)} style={styles.smallButton}>
-                  {showVideo ? "Masquer vidéo" : "Voir cours vidéo"}
+                <button
+                  onClick={() => setShowExercises(!showExercises)}
+                  style={styles.smallButton}
+                >
+                  {showExercises ? "Masquer exercices" : "Voir exercices"}
+                </button>
+
+                <button
+                  onClick={() => setShowShortCorrections(!showShortCorrections)}
+                  style={styles.smallButton}
+                >
+                  {showShortCorrections
+                    ? "Masquer correction courte"
+                    : "Correction courte"}
+                </button>
+
+                <button
+                  onClick={() =>
+                    setShowDetailedCorrections(!showDetailedCorrections)
+                  }
+                  style={styles.smallButton}
+                >
+                  {showDetailedCorrections
+                    ? "Masquer correction détaillée"
+                    : "Correction détaillée"}
+                </button>
+
+                <button
+                  onClick={() => setShowVideo(!showVideo)}
+                  style={styles.smallButton}
+                >
+                  {showVideo ? "Masquer vidéo" : "Cours vidéo"}
                 </button>
 
                 <button onClick={downloadPDF} style={styles.pdfButton}>
@@ -368,31 +439,45 @@ Important :
               <h1>{matiere} — {niveau}</h1>
               <h2 style={styles.pdfSubtitle}>{chapitre}</h2>
 
-              <div style={styles.warning}>
-                Les corrections et la partie vidéo sont incluses dans le cours.
-                Utilise les boutons pour les afficher progressivement sur le site.
-              </div>
+              <Section title="📚 Cours" content={getSection("COURS")} />
 
-              <div style={styles.pre}>{answer}</div>
+              {showQuiz && (
+                <Section
+                  title="🧠 Quiz automatisé"
+                  content={getSection("QUIZ_AUTOMATISE")}
+                />
+              )}
 
-              {showCorrection && (
-                <div style={styles.hiddenBox}>
-                  <h2>✅ Corrections</h2>
-                  <p>
-                    Les corrections courtes et détaillées sont dans le contenu généré.
-                    Demande à l’IA de bien séparer les corrections si tu veux une version encore plus structurée.
-                  </p>
-                </div>
+              {showExercises && (
+                <Section
+                  title="✍️ Exercices progressifs"
+                  content={getSection("EXERCICES_PROGRESSIFS")}
+                />
+              )}
+
+              {showShortCorrections && (
+                <Section
+                  title="✅ Corrections courtes"
+                  content={getSection("CORRECTIONS_COURTES")}
+                />
+              )}
+
+              {showDetailedCorrections && (
+                <Section
+                  title="🧩 Corrections détaillées"
+                  content={getSection("CORRECTIONS_DETAILLEES")}
+                />
               )}
 
               {showVideo && (
-                <div style={styles.hiddenBox}>
-                  <h2>🎬 Cours vidéo</h2>
-                  <p>
-                    La section “Cours vidéo” contient un script minute par minute
-                    et des idées de visuels pour créer une vidéo pédagogique.
-                  </p>
-                </div>
+                <Section
+                  title="🎬 Cours vidéo"
+                  content={getSection("COURS_VIDEO")}
+                />
+              )}
+
+              {!getSection("COURS") && (
+                <div style={styles.pre}>{answer}</div>
               )}
             </div>
           </section>
@@ -403,15 +488,26 @@ Important :
 
           <div style={styles.featureGrid}>
             <div style={styles.featureCard}>⚡ Génération rapide</div>
-            <div style={styles.featureCard}>🧠 Explications adaptées</div>
+            <div style={styles.featureCard}>🧠 Quiz automatiques</div>
             <div style={styles.featureCard}>✍️ Exercices progressifs</div>
-            <div style={styles.featureCard}>✅ Corrections détaillées</div>
+            <div style={styles.featureCard}>✅ Corrections cachées</div>
             <div style={styles.featureCard}>🎬 Script vidéo inclus</div>
             <div style={styles.featureCard}>📄 Export PDF</div>
           </div>
         </section>
       </main>
     </>
+  );
+}
+
+function Section({ title, content }: { title: string; content: string }) {
+  if (!content) return null;
+
+  return (
+    <div style={styles.sectionBox}>
+      <h2 style={styles.sectionBoxTitle}>{title}</h2>
+      <div style={styles.pre}>{content}</div>
+    </div>
   );
 }
 
@@ -633,26 +729,23 @@ const styles: any = {
     color: "#2563eb",
   },
 
-  warning: {
-    background: "#eff6ff",
-    color: "#1d4ed8",
-    padding: 14,
-    borderRadius: 16,
-    marginBottom: 22,
-    fontWeight: 800,
+  sectionBox: {
+    marginTop: 28,
+    padding: 22,
+    borderRadius: 22,
+    background: "#f8fafc",
+    border: "1px solid #e2e8f0",
+  },
+
+  sectionBoxTitle: {
+    marginTop: 0,
+    color: "#0f172a",
   },
 
   pre: {
     whiteSpace: "pre-wrap",
     lineHeight: 1.75,
     fontSize: 16,
-  },
-
-  hiddenBox: {
-    marginTop: 26,
-    padding: 20,
-    borderRadius: 20,
-    background: "#f1f5f9",
     color: "#0f172a",
   },
 
