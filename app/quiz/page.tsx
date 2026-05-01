@@ -4,87 +4,84 @@ import { useState } from "react";
 
 export default function QuizPage() {
   const [matiere, setMatiere] = useState("Mathématiques");
-  const [niveau, setNiveau] = useState("6e");
-  const [chapitre, setChapitre] = useState("Fractions");
-  const [mode, setMode] = useState("quiz");
+  const [niveau, setNiveau] = useState("Terminale");
+  const [chapitre, setChapitre] = useState("Limites");
 
   const [quiz, setQuiz] = useState<any>(null);
+  const [current, setCurrent] = useState(0);
+  const [selected, setSelected] = useState<number | null>(null);
   const [answers, setAnswers] = useState<number[]>([]);
-  const [showResult, setShowResult] = useState(false);
+  const [showCorrection, setShowCorrection] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [finished, setFinished] = useState(false);
 
-  async function generateQuiz(newMode = mode) {
+  async function generateQuiz() {
     setLoading(true);
-    setShowResult(false);
-    setAnswers([]);
     setQuiz(null);
+    setCurrent(0);
+    setSelected(null);
+    setAnswers([]);
+    setShowCorrection(false);
+    setFinished(false);
 
-    try {
-      const res = await fetch("/api/quiz", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          matiere,
-          niveau,
-          chapitre,
-          mode: newMode,
-        }),
-      });
+    const res = await fetch("/api/quiz", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ matiere, niveau, chapitre, mode: "quiz" }),
+    });
 
-      const data = await res.json();
-
-      if (data.error) {
-        alert(data.error);
-        setLoading(false);
-        return;
-      }
-
-      setQuiz(data);
-      setAnswers(Array(data.questions?.length || 0).fill(-1));
-    } catch {
-      alert("Erreur génération quiz");
-    }
-
+    const data = await res.json();
+    setQuiz(data);
     setLoading(false);
   }
 
-  function selectAnswer(questionIndex: number, choiceIndex: number) {
-    if (showResult) return;
+  function validateAnswer(index: number) {
+    if (showCorrection) return;
+
+    setSelected(index);
+    setShowCorrection(true);
 
     const copy = [...answers];
-    copy[questionIndex] = choiceIndex;
+    copy[current] = index;
     setAnswers(copy);
   }
 
-  function finishQuiz() {
+  function nextQuestion() {
     if (!quiz?.questions) return;
 
-    if (answers.includes(-1)) {
-      alert("Réponds à toutes les questions");
+    if (current + 1 >= quiz.questions.length) {
+      setFinished(true);
       return;
     }
 
-    setShowResult(true);
+    setCurrent(current + 1);
+    setSelected(null);
+    setShowCorrection(false);
   }
 
-  const score =
-    quiz?.questions?.reduce((total: number, q: any, index: number) => {
-      return total + (answers[index] === q.answer ? 1 : 0);
-    }, 0) || 0;
+  function changeQuestions() {
+    generateQuiz();
+  }
 
-  const note =
-    quiz?.questions?.length > 0
-      ? Math.round((score / quiz.questions.length) * 20)
-      : 0;
+  const questions = quiz?.questions || [];
+  const question = questions[current];
+
+  const score = questions.reduce((total: number, q: any, i: number) => {
+    return total + (answers[i] === q.answer ? 1 : 0);
+  }, 0);
+
+  const note = questions.length
+    ? Math.round((score / questions.length) * 20)
+    : 0;
 
   return (
     <main style={styles.page}>
-      <section style={styles.header}>
-        <a href="/" style={styles.back}>← Retour accueil</a>
+      <a href="/" style={styles.back}>← Retour accueil</a>
 
-        <h1 style={styles.title}>🧠 Quiz automatisé EduAI</h1>
+      <section style={styles.top}>
+        <h1 style={styles.title}>🧠 Quiz automatique</h1>
         <p style={styles.subtitle}>
-          Réponds aux questions, termine le quiz, puis découvre ta note et les corrections.
+          Questions générées par l’IA, correction automatique et note finale.
         </p>
 
         <div style={styles.form}>
@@ -108,102 +105,94 @@ export default function QuizPage() {
             onChange={(e) => setChapitre(e.target.value)}
             placeholder="Chapitre"
           />
-        </div>
 
-        <div style={styles.actions}>
-          <button
-            onClick={() => {
-              setMode("quiz");
-              generateQuiz("quiz");
-            }}
-            style={styles.primaryButton}
-          >
-            Générer quiz
-          </button>
-
-          <button
-            onClick={() => {
-              setMode("evaluation");
-              generateQuiz("evaluation");
-            }}
-            style={styles.purpleButton}
-          >
-            Évaluation finale
-          </button>
-
-          <button onClick={() => generateQuiz(mode)} style={styles.greenButton}>
-            Changer les questions
+          <button onClick={generateQuiz} style={styles.generate}>
+            {loading ? "Génération..." : "Générer le quiz"}
           </button>
         </div>
-
-        {loading && <p style={styles.loading}>⏳ Génération en cours...</p>}
       </section>
 
-      {quiz?.questions && (
-        <section style={styles.quizBox}>
-          <h2 style={styles.quizTitle}>{quiz.title || "Quiz EduAI"}</h2>
-
-          {quiz.questions.map((q: any, questionIndex: number) => (
-            <div key={questionIndex} style={styles.questionBox}>
-              <h3 style={styles.questionTitle}>
-                {questionIndex + 1}. {q.question}
-              </h3>
-
-              {(q.choices || []).map((choice: string, choiceIndex: number) => {
-                const selected = answers[questionIndex] === choiceIndex;
-                const correct = q.answer === choiceIndex;
-
-                let background = "white";
-                let border = "1px solid #cbd5e1";
-
-                if (!showResult && selected) {
-                  background = "#dbeafe";
-                  border = "2px solid #2563eb";
-                }
-
-                if (showResult && correct) {
-                  background = "#dcfce7";
-                  border = "2px solid #22c55e";
-                }
-
-                if (showResult && selected && !correct) {
-                  background = "#fee2e2";
-                  border = "2px solid #ef4444";
-                }
-
-                return (
-                  <button
-                    key={choiceIndex}
-                    onClick={() => selectAnswer(questionIndex, choiceIndex)}
-                    style={{
-                      ...styles.choiceButton,
-                      background,
-                      border,
-                    }}
-                  >
-                    {choice}
-                  </button>
-                );
-              })}
-
-              {showResult && (
-                <div style={styles.correction}>
-                  <strong>Correction :</strong>{" "}
-                  {q.explanation || "Correction non fournie."}
-                </div>
-              )}
+      {question && !finished && (
+        <section style={styles.quizCard}>
+          <div style={styles.quizHeader}>
+            <div style={styles.chapter}>📐 {chapitre.toUpperCase()}</div>
+            <div style={styles.counter}>
+              {current + 1}/{questions.length}
             </div>
-          ))}
+          </div>
 
-          {!showResult ? (
-            <button onClick={finishQuiz} style={styles.finishButton}>
-              Terminer et voir la note
-            </button>
-          ) : (
-            <div style={styles.scoreBox}>
-              ✅ Score : {score}/{quiz.questions.length} — Note : {note}/20
+          <div style={styles.progress}>
+            <div
+              style={{
+                ...styles.progressFill,
+                width: `${((current + 1) / questions.length) * 100}%`,
+              }}
+            />
+          </div>
+
+          <h2 style={styles.question}>{question.question}</h2>
+
+          <div style={styles.choices}>
+            {question.choices.map((choice: string, index: number) => {
+              const isSelected = selected === index;
+              const isCorrect = question.answer === index;
+
+              let style = styles.choice;
+
+              if (showCorrection && isCorrect) {
+                style = { ...styles.choice, ...styles.correct };
+              }
+
+              if (showCorrection && isSelected && !isCorrect) {
+                style = { ...styles.choice, ...styles.wrong };
+              }
+
+              if (!showCorrection && isSelected) {
+                style = { ...styles.choice, ...styles.selected };
+              }
+
+              return (
+                <button
+                  key={index}
+                  onClick={() => validateAnswer(index)}
+                  style={style}
+                >
+                  {choice}
+                </button>
+              );
+            })}
+          </div>
+
+          {showCorrection && (
+            <div style={styles.correction}>
+              <strong>
+                {selected === question.answer ? "✅ Bonne réponse" : "❌ Mauvaise réponse"}
+              </strong>
+              <p>{question.explanation}</p>
+
+              <button onClick={nextQuestion} style={styles.next}>
+                {current + 1 === questions.length
+                  ? "Voir la note finale"
+                  : "Question suivante →"}
+              </button>
             </div>
           )}
+        </section>
+      )}
+
+      {finished && (
+        <section style={styles.finalCard}>
+          <h2>🏆 Résultat final</h2>
+
+          <div style={styles.bigScore}>{note}/20</div>
+
+          <p>
+            Score : {score}/{questions.length}
+          </p>
+
+          <button onClick={changeQuestions} style={styles.generate}>
+            Changer les questions
+          </button>
         </section>
       )}
     </main>
@@ -213,161 +202,173 @@ export default function QuizPage() {
 const styles: any = {
   page: {
     minHeight: "100vh",
-    background:
-      "radial-gradient(circle at top left,#22d3ee55,transparent 30%), radial-gradient(circle at top right,#a855f755,transparent 30%), linear-gradient(135deg,#020617,#0f172a)",
-    color: "white",
+    background: "#e8dfd2",
+    color: "#111827",
     fontFamily: "Arial, sans-serif",
     padding: 30,
   },
 
-  header: {
-    maxWidth: 1050,
-    margin: "0 auto",
-    background: "rgba(255,255,255,0.1)",
-    border: "1px solid rgba(255,255,255,0.15)",
-    borderRadius: 30,
-    padding: 30,
-    boxShadow: "0 30px 80px rgba(0,0,0,0.35)",
+  back: {
+    display: "inline-block",
+    marginBottom: 20,
+    color: "#4338ca",
+    fontWeight: 900,
+    textDecoration: "none",
   },
 
-  back: {
-    color: "#a5f3fc",
-    textDecoration: "none",
-    fontWeight: 900,
+  top: {
+    maxWidth: 1000,
+    margin: "0 auto 28px",
+    background: "white",
+    borderRadius: 28,
+    padding: 28,
+    boxShadow: "0 10px 0 rgba(0,0,0,0.15)",
   },
 
   title: {
-    fontSize: "clamp(38px,6vw,64px)",
-    marginBottom: 12,
+    fontSize: 42,
+    margin: 0,
   },
 
   subtitle: {
-    color: "#cbd5e1",
     fontSize: 18,
-    lineHeight: 1.6,
+    color: "#475569",
   },
 
   form: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
-    gap: 14,
-    marginTop: 24,
+    gap: 12,
+    marginTop: 20,
   },
 
   input: {
     padding: 15,
-    borderRadius: 16,
-    border: "none",
+    borderRadius: 14,
+    border: "1px solid #d1d5db",
     fontSize: 16,
   },
 
-  actions: {
-    display: "flex",
-    gap: 12,
-    flexWrap: "wrap",
-    marginTop: 20,
-  },
-
-  primaryButton: {
-    padding: "14px 18px",
-    borderRadius: 16,
-    border: "none",
-    background: "#2563eb",
-    color: "white",
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-
-  purpleButton: {
-    padding: "14px 18px",
-    borderRadius: 16,
-    border: "none",
-    background: "#7c3aed",
-    color: "white",
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-
-  greenButton: {
-    padding: "14px 18px",
-    borderRadius: 16,
-    border: "none",
-    background: "#22c55e",
-    color: "white",
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-
-  loading: {
-    marginTop: 18,
-    fontWeight: 900,
-  },
-
-  quizBox: {
-    maxWidth: 1050,
-    margin: "30px auto",
-    background: "white",
-    color: "#0f172a",
-    borderRadius: 30,
-    padding: 30,
-    boxShadow: "0 30px 90px rgba(0,0,0,0.35)",
-  },
-
-  quizTitle: {
-    fontSize: 32,
-    marginTop: 0,
-  },
-
-  questionBox: {
-    marginTop: 26,
-    paddingTop: 22,
-    borderTop: "1px solid #e2e8f0",
-  },
-
-  questionTitle: {
-    fontSize: 20,
-  },
-
-  choiceButton: {
-    display: "block",
-    width: "100%",
+  generate: {
     padding: 15,
-    marginTop: 10,
-    borderRadius: 16,
+    borderRadius: 14,
+    border: "none",
+    background: "#4f46e5",
+    color: "white",
+    fontWeight: 900,
+    cursor: "pointer",
+    fontSize: 16,
+  },
+
+  quizCard: {
+    maxWidth: 900,
+    margin: "0 auto",
+    background: "white",
+    borderRadius: 34,
+    padding: 34,
+    boxShadow: "0 10px 0 rgba(0,0,0,0.18)",
+  },
+
+  quizHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    fontWeight: 900,
+    marginBottom: 18,
+  },
+
+  chapter: {
+    fontSize: 18,
+  },
+
+  counter: {
+    fontSize: 22,
+  },
+
+  progress: {
+    height: 10,
+    background: "#d1d5db",
+    borderRadius: 999,
+    overflow: "hidden",
+    marginBottom: 35,
+  },
+
+  progressFill: {
+    height: "100%",
+    background: "linear-gradient(90deg,#8b5cf6,#ec4899)",
+    borderRadius: 999,
+  },
+
+  question: {
+    textAlign: "center",
+    fontSize: 28,
+    fontWeight: 500,
+    marginBottom: 35,
+  },
+
+  choices: {
+    display: "grid",
+    gap: 22,
+  },
+
+  choice: {
+    background: "white",
+    border: "1px solid #e5e7eb",
+    padding: "22px 28px",
+    borderRadius: 18,
+    fontSize: 20,
     textAlign: "left",
     cursor: "pointer",
-    fontSize: 16,
+    boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
+  },
+
+  selected: {
+    background: "#dbeafe",
+    border: "2px solid #2563eb",
+  },
+
+  correct: {
+    background: "#dcfce7",
+    border: "2px solid #22c55e",
+  },
+
+  wrong: {
+    background: "#fee2e2",
+    border: "2px solid #ef4444",
   },
 
   correction: {
-    marginTop: 14,
-    padding: 16,
-    background: "#f1f5f9",
-    borderRadius: 16,
+    marginTop: 28,
+    background: "#f8fafc",
+    borderRadius: 20,
+    padding: 22,
     lineHeight: 1.6,
   },
 
-  finishButton: {
-    width: "100%",
-    marginTop: 30,
-    padding: 18,
+  next: {
+    marginTop: 16,
+    padding: "14px 20px",
+    borderRadius: 14,
     border: "none",
-    borderRadius: 18,
-    background: "#020617",
+    background: "#111827",
     color: "white",
     fontWeight: 900,
     cursor: "pointer",
-    fontSize: 16,
   },
 
-  scoreBox: {
-    marginTop: 30,
-    padding: 22,
-    background: "#dcfce7",
-    color: "#166534",
-    borderRadius: 20,
+  finalCard: {
+    maxWidth: 650,
+    margin: "40px auto",
+    background: "white",
+    borderRadius: 34,
+    padding: 40,
     textAlign: "center",
-    fontSize: 24,
+    boxShadow: "0 10px 0 rgba(0,0,0,0.18)",
+  },
+
+  bigScore: {
+    fontSize: 80,
     fontWeight: 900,
+    color: "#4f46e5",
   },
 };
