@@ -13,32 +13,20 @@ export default function Home() {
   const [niveau, setNiveau] = useState("");
   const [chapitre, setChapitre] = useState("");
 
-  const [answer, setAnswer] = useState("");
+  const [course, setCourse] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const [showQuiz, setShowQuiz] = useState(true);
-  const [showExercises, setShowExercises] = useState(true);
-  const [showShortCorrections, setShowShortCorrections] = useState(false);
-  const [showDetailedCorrections, setShowDetailedCorrections] = useState(false);
-  const [showVideo, setShowVideo] = useState(false);
 
   useEffect(() => {
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
-    });
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user || null);
-      }
+      (_event, session) => setUser(session?.user || null)
     );
 
-    return () => {
-      listener.subscription.unsubscribe();
-    };
+    return () => listener.subscription.unsubscribe();
   }, []);
 
   const niveaux = useMemo(() => {
@@ -61,9 +49,9 @@ export default function Home() {
   }, [matiere, niveau]);
 
   function getSection(title: string) {
-    if (!answer) return "";
+    if (!course) return "";
     const regex = new RegExp(`### ${title}([\\s\\S]*?)(?=### |$)`);
-    return answer.match(regex)?.[1]?.trim() || "";
+    return course.match(regex)?.[1]?.trim() || "";
   }
 
   async function handleSignup() {
@@ -121,7 +109,7 @@ export default function Home() {
 
     await supabase.auth.signOut();
     setUser(null);
-    setAnswer("");
+    setCourse("");
   }
 
   async function generateCourse() {
@@ -131,73 +119,12 @@ export default function Home() {
     }
 
     if (!matiere || !niveau || !chapitre) {
-      alert("Choisis matière, niveau et chapitre");
+      alert("Choisis une matière, un niveau et un chapitre");
       return;
     }
 
     setLoading(true);
-    setAnswer("");
-    setShowQuiz(true);
-    setShowExercises(true);
-    setShowShortCorrections(false);
-    setShowDetailedCorrections(false);
-    setShowVideo(false);
-
-    const question = `
-Crée un cours scolaire PREMIUM en français.
-
-Matière : ${matiere}
-Niveau : ${niveau}
-Chapitre : ${chapitre}
-
-Réponds obligatoirement avec ces séparateurs exacts :
-
-### COURS
-1. Objectifs du chapitre
-2. Introduction simple et motivante
-3. Cours détaillé et progressif
-4. Définitions importantes
-5. Méthodes étape par étape
-6. Exemples corrigés
-7. Résumé à retenir
-8. Fiche méthode
-
-### QUIZ_AUTOMATISE
-Crée 10 questions progressives.
-Pour chaque question :
-- question
-- choix A/B/C/D si possible
-- bonne réponse indiquée clairement
-
-### EXERCICES_PROGRESSIFS
-Crée des exercices :
-- Niveau 1 : facile
-- Niveau 2 : moyen
-- Niveau 3 : difficile
-- Niveau 4 : défi / examen
-
-### CORRECTIONS_COURTES
-Donne les corrections courtes de tous les exercices et quiz.
-
-### CORRECTIONS_DETAILLEES
-Donne les corrections détaillées étape par étape de tous les exercices.
-
-### COURS_VIDEO
-Crée une proposition de cours vidéo :
-- titre de la vidéo
-- durée recommandée
-- script minute par minute
-- idées de visuels à afficher
-- phrase d’introduction
-- phrase de conclusion
-
-Important :
-- Le cours doit être adapté au niveau ${niveau}
-- Ne saute aucune étape
-- Explique simplement
-- Donne beaucoup d’exemples
-- Structure avec des titres clairs
-`;
+    setCourse("");
 
     try {
       const res = await fetch("/api/ia", {
@@ -205,19 +132,21 @@ Important :
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({
+          matiere,
+          niveau,
+          chapitre,
+        }),
       });
 
       const json = await res.json();
-      setAnswer(json.answer || "Erreur IA");
+      setCourse(json.content || json.answer || "Erreur génération du cours.");
 
       setTimeout(() => {
-        document.getElementById("result")?.scrollIntoView({
-          behavior: "smooth",
-        });
+        document.getElementById("cours")?.scrollIntoView({ behavior: "smooth" });
       }, 300);
     } catch {
-      setAnswer("Erreur serveur IA.");
+      setCourse("Erreur serveur IA.");
     }
 
     setLoading(false);
@@ -227,6 +156,12 @@ Important :
     document.title = `Cours-${matiere}-${chapitre}`;
     window.print();
   }
+
+  const quizUrl = `/quiz?matiere=${encodeURIComponent(
+    matiere
+  )}&niveau=${encodeURIComponent(niveau)}&chapitre=${encodeURIComponent(
+    chapitre
+  )}`;
 
   return (
     <>
@@ -253,12 +188,8 @@ Important :
             <div style={styles.logo}>🎓 EduAI</div>
 
             <div style={styles.navLinks}>
-              <a href="#generator" style={styles.link}>
-                Générateur
-              </a>
-              <a href="#features" style={styles.link}>
-                Avantages
-              </a>
+              <a href="#generator" style={styles.link}>Générateur</a>
+              <a href={quizUrl} style={styles.quizNav}>Quiz</a>
 
               {user ? (
                 <button onClick={handleLogout} style={styles.logout}>
@@ -272,23 +203,23 @@ Important :
             </div>
           </nav>
 
-          <div style={styles.grid}>
+          <div style={styles.layout}>
             <div>
-              <span style={styles.badge}>✨ IA scolaire premium</span>
+              <span style={styles.badge}>✨ Cours IA premium</span>
 
               <h1 style={styles.title}>
-                Génère des cours haut de gamme avec l’IA.
+                Des cours visuels, clairs et interactifs.
               </h1>
 
               <p style={styles.subtitle}>
-                Cours détaillés, quiz automatiques, exercices progressifs,
-                corrections cachées, scripts vidéo et export PDF.
+                Génère un cours structuré, avec méthode, exemples, schéma,
+                script vidéo et quiz interactif séparé.
               </p>
 
               <div style={styles.tags}>
-                <span style={styles.tag}>🎓 Collège → Prépa</span>
-                <span style={styles.tag}>📚 Maths · Physique · Chimie</span>
-                <span style={styles.tag}>📄 PDF exportable</span>
+                <span style={styles.tag}>📘 Cours structuré</span>
+                <span style={styles.tag}>🧠 Quiz interactif</span>
+                <span style={styles.tag}>📄 PDF</span>
               </div>
             </div>
 
@@ -317,7 +248,7 @@ Important :
                     {loading ? "Connexion..." : "Se connecter"}
                   </button>
 
-                  <button onClick={handleSignup} style={styles.secondaryButton}>
+                  <button onClick={handleSignup} style={styles.darkButton}>
                     Créer un compte
                   </button>
                 </>
@@ -338,9 +269,7 @@ Important :
                   >
                     <option value="">Choisir une matière</option>
                     {Object.keys(data).map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
+                      <option key={m} value={m}>{m}</option>
                     ))}
                   </select>
 
@@ -354,9 +283,7 @@ Important :
                   >
                     <option value="">Choisir un niveau</option>
                     {niveaux.map((n: any) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
+                      <option key={n} value={n}>{n}</option>
                     ))}
                   </select>
 
@@ -367,67 +294,32 @@ Important :
                   >
                     <option value="">Choisir un chapitre</option>
                     {chapitres.map((c: any) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
+                      <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
 
                   <button onClick={generateCourse} style={styles.button}>
-                    {loading ? "Génération en cours..." : "✨ Générer le cours"}
+                    {loading ? "Génération..." : "✨ Générer le cours"}
                   </button>
+
+                  <a href={quizUrl} style={styles.quizButton}>
+                    🧠 Lancer le quiz interactif
+                  </a>
                 </div>
               )}
             </div>
           </div>
         </section>
 
-        {answer && (
-          <section id="result" style={styles.resultWrap}>
-            <div style={styles.resultHeader} className="no-print">
+        {course && (
+          <section id="cours" style={styles.courseWrap}>
+            <div style={styles.courseHeader} className="no-print">
               <h2>📘 Cours généré</h2>
 
-              <div style={styles.resultButtons}>
-                <button
-                  onClick={() => setShowQuiz(!showQuiz)}
-                  style={styles.smallButton}
-                >
-                  {showQuiz ? "Masquer quiz" : "Voir quiz"}
-                </button>
-
-                <button
-                  onClick={() => setShowExercises(!showExercises)}
-                  style={styles.smallButton}
-                >
-                  {showExercises ? "Masquer exercices" : "Voir exercices"}
-                </button>
-
-                <button
-                  onClick={() => setShowShortCorrections(!showShortCorrections)}
-                  style={styles.smallButton}
-                >
-                  {showShortCorrections
-                    ? "Masquer correction courte"
-                    : "Correction courte"}
-                </button>
-
-                <button
-                  onClick={() =>
-                    setShowDetailedCorrections(!showDetailedCorrections)
-                  }
-                  style={styles.smallButton}
-                >
-                  {showDetailedCorrections
-                    ? "Masquer correction détaillée"
-                    : "Correction détaillée"}
-                </button>
-
-                <button
-                  onClick={() => setShowVideo(!showVideo)}
-                  style={styles.smallButton}
-                >
-                  {showVideo ? "Masquer vidéo" : "Cours vidéo"}
-                </button>
+              <div style={styles.headerButtons}>
+                <a href={quizUrl} style={styles.quizButtonSmall}>
+                  🧠 Quiz interactif
+                </a>
 
                 <button onClick={downloadPDF} style={styles.pdfButton}>
                   📄 Télécharger PDF
@@ -435,87 +327,80 @@ Important :
               </div>
             </div>
 
-            <div id="print-area" style={styles.result}>
-              <h1>{matiere} — {niveau}</h1>
-              <h2 style={styles.pdfSubtitle}>{chapitre}</h2>
+            <article id="print-area" style={styles.course}>
+              <div style={styles.courseTop}>
+                <div>
+                  <p style={styles.smallLabel}>{matiere}</p>
+                  <h1 style={styles.courseTitle}>{chapitre}</h1>
+                  <p style={styles.level}>{niveau}</p>
+                </div>
 
-              <Section title="📚 Cours" content={getSection("COURS")} />
+                <div style={styles.scoreBadge}>Cours premium</div>
+              </div>
 
-              {showQuiz && (
-                <Section
-                  title="🧠 Quiz automatisé"
-                  content={getSection("QUIZ_AUTOMATISE")}
-                />
-              )}
+              <Section icon="🚀" title="Introduction" content={getSection("INTRODUCTION")} />
+              <Section icon="🎯" title="Objectifs" content={getSection("OBJECTIFS")} />
+              <Section icon="📚" title="Cours" content={getSection("COURS")} />
+              <Section icon="🔑" title="Définitions" content={getSection("DEFINITIONS")} />
+              <Section icon="🧭" title="Méthodes" content={getSection("METHODES")} />
+              <Section icon="✅" title="Exemples" content={getSection("EXEMPLES")} />
 
-              {showExercises && (
-                <Section
-                  title="✍️ Exercices progressifs"
-                  content={getSection("EXERCICES_PROGRESSIFS")}
-                />
-              )}
+              <div style={styles.schemaBox}>
+                <h2 style={styles.sectionTitle}>📐 Schéma à comprendre</h2>
+                <div style={styles.fakeBoard}>
+                  <div style={styles.axisX}></div>
+                  <div style={styles.axisY}></div>
+                  <div style={styles.curve}></div>
+                </div>
+                <Text content={getSection("SCHEMA_TEXTE")} />
+              </div>
 
-              {showShortCorrections && (
-                <Section
-                  title="✅ Corrections courtes"
-                  content={getSection("CORRECTIONS_COURTES")}
-                />
-              )}
+              <Section icon="🧠" title="À retenir" content={getSection("A_RETENIR")} />
+              <Section icon="🎬" title="Cours vidéo" content={getSection("VIDEO")} />
 
-              {showDetailedCorrections && (
-                <Section
-                  title="🧩 Corrections détaillées"
-                  content={getSection("CORRECTIONS_DETAILLEES")}
-                />
-              )}
+              {!getSection("COURS") && <Text content={course} />}
 
-              {showVideo && (
-                <Section
-                  title="🎬 Cours vidéo"
-                  content={getSection("COURS_VIDEO")}
-                />
-              )}
-
-              {!getSection("COURS") && (
-                <div style={styles.pre}>{answer}</div>
-              )}
-            </div>
+              <a href={quizUrl} style={styles.quizEndButton} className="no-print">
+                🧠 Faire le quiz interactif de ce chapitre
+              </a>
+            </article>
           </section>
         )}
-
-        <section id="features" style={styles.features} className="no-print">
-          <h2 style={styles.sectionTitle}>Pourquoi EduAI ?</h2>
-
-          <div style={styles.featureGrid}>
-            <div style={styles.featureCard}>⚡ Génération rapide</div>
-            <div style={styles.featureCard}>🧠 Quiz automatiques</div>
-            <div style={styles.featureCard}>✍️ Exercices progressifs</div>
-            <div style={styles.featureCard}>✅ Corrections cachées</div>
-            <div style={styles.featureCard}>🎬 Script vidéo inclus</div>
-            <div style={styles.featureCard}>📄 Export PDF</div>
-          </div>
-        </section>
       </main>
     </>
   );
 }
 
-function Section({ title, content }: { title: string; content: string }) {
+function Section({
+  icon,
+  title,
+  content,
+}: {
+  icon: string;
+  title: string;
+  content: string;
+}) {
   if (!content) return null;
 
   return (
-    <div style={styles.sectionBox}>
-      <h2 style={styles.sectionBoxTitle}>{title}</h2>
-      <div style={styles.pre}>{content}</div>
-    </div>
+    <section style={styles.section}>
+      <h2 style={styles.sectionTitle}>
+        {icon} {title}
+      </h2>
+      <Text content={content} />
+    </section>
   );
+}
+
+function Text({ content }: { content: string }) {
+  return <div style={styles.text}>{content}</div>;
 }
 
 const styles: any = {
   page: {
     minHeight: "100vh",
-    background: "#020617",
-    color: "white",
+    background: "#ede4d6",
+    color: "#0f172a",
     fontFamily: "Arial, sans-serif",
   },
 
@@ -523,11 +408,12 @@ const styles: any = {
     minHeight: "100vh",
     padding: 28,
     background:
-      "radial-gradient(circle at top left,#22d3ee55,transparent 30%), radial-gradient(circle at top right,#a855f755,transparent 30%), linear-gradient(135deg,#020617,#0f172a)",
+      "radial-gradient(circle at top left,#60a5fa55,transparent 28%), radial-gradient(circle at top right,#a855f755,transparent 25%), linear-gradient(135deg,#020617,#111827)",
+    color: "white",
   },
 
   nav: {
-    maxWidth: 1200,
+    maxWidth: 1250,
     margin: "0 auto",
     display: "flex",
     justifyContent: "space-between",
@@ -542,21 +428,30 @@ const styles: any = {
 
   navLinks: {
     display: "flex",
-    gap: 18,
+    gap: 14,
     alignItems: "center",
     flexWrap: "wrap",
   },
 
   link: {
     color: "#e0f2fe",
-    textDecoration: "none",
     fontWeight: 900,
+    textDecoration: "none",
+  },
+
+  quizNav: {
+    background: "#4f46e5",
+    color: "white",
+    padding: "12px 18px",
+    borderRadius: 999,
+    fontWeight: 900,
+    textDecoration: "none",
   },
 
   navButton: {
     background: "white",
     color: "#020617",
-    padding: "12px 20px",
+    padding: "12px 18px",
     borderRadius: 999,
     fontWeight: 900,
     textDecoration: "none",
@@ -565,16 +460,16 @@ const styles: any = {
   logout: {
     background: "#ef4444",
     color: "white",
-    padding: "12px 20px",
+    padding: "12px 18px",
     borderRadius: 999,
     border: "none",
     fontWeight: 900,
     cursor: "pointer",
   },
 
-  grid: {
-    maxWidth: 1200,
-    margin: "90px auto",
+  layout: {
+    maxWidth: 1250,
+    margin: "85px auto 0",
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))",
     gap: 50,
@@ -584,14 +479,15 @@ const styles: any = {
   badge: {
     display: "inline-block",
     background: "rgba(255,255,255,0.12)",
-    padding: "10px 16px",
+    border: "1px solid rgba(255,255,255,0.18)",
+    padding: "11px 16px",
     borderRadius: 999,
-    color: "#a5f3fc",
     fontWeight: 900,
+    color: "#a5f3fc",
   },
 
   title: {
-    fontSize: "clamp(48px,8vw,82px)",
+    fontSize: "clamp(48px,8vw,84px)",
     lineHeight: 1,
     letterSpacing: -3,
     margin: "28px 0",
@@ -599,9 +495,9 @@ const styles: any = {
 
   subtitle: {
     fontSize: 21,
-    color: "#cbd5e1",
     lineHeight: 1.6,
-    maxWidth: 650,
+    color: "#cbd5e1",
+    maxWidth: 680,
   },
 
   tags: {
@@ -620,7 +516,7 @@ const styles: any = {
   },
 
   card: {
-    background: "rgba(255,255,255,0.96)",
+    background: "white",
     color: "#0f172a",
     padding: 34,
     borderRadius: 34,
@@ -655,13 +551,13 @@ const styles: any = {
     fontSize: 16,
   },
 
-  secondaryButton: {
+  darkButton: {
     width: "100%",
     marginTop: 12,
     padding: 17,
     border: "none",
     borderRadius: 18,
-    background: "#0f172a",
+    background: "#020617",
     color: "white",
     fontWeight: 900,
     cursor: "pointer",
@@ -676,102 +572,180 @@ const styles: any = {
     fontWeight: 900,
   },
 
-  resultWrap: {
-    maxWidth: 1050,
-    margin: "0 auto",
-    padding: "60px 32px",
+  quizButton: {
+    display: "block",
+    textAlign: "center",
+    marginTop: 14,
+    padding: 17,
+    borderRadius: 18,
+    background: "#020617",
+    color: "white",
+    fontWeight: 900,
+    textDecoration: "none",
   },
 
-  resultHeader: {
+  courseWrap: {
+    maxWidth: 1180,
+    margin: "0 auto",
+    padding: "70px 28px",
+  },
+
+  courseHeader: {
     display: "flex",
     justifyContent: "space-between",
+    gap: 16,
     alignItems: "center",
-    gap: 20,
     flexWrap: "wrap",
+    marginBottom: 24,
   },
 
-  resultButtons: {
+  headerButtons: {
     display: "flex",
     gap: 12,
     flexWrap: "wrap",
   },
 
-  smallButton: {
-    background: "#334155",
+  quizButtonSmall: {
+    background: "#4f46e5",
     color: "white",
     padding: "14px 18px",
     borderRadius: 16,
-    border: "none",
     fontWeight: 900,
-    cursor: "pointer",
+    textDecoration: "none",
   },
 
   pdfButton: {
     background: "#22c55e",
     color: "white",
-    padding: "14px 20px",
-    borderRadius: 16,
+    padding: "14px 18px",
     border: "none",
+    borderRadius: 16,
     fontWeight: 900,
     cursor: "pointer",
   },
 
-  result: {
+  course: {
     background: "white",
     color: "#0f172a",
-    padding: 36,
-    borderRadius: 28,
-    marginTop: 20,
-    boxShadow: "0 25px 80px rgba(0,0,0,0.28)",
+    borderRadius: 34,
+    padding: 38,
+    boxShadow: "0 10px 0 rgba(0,0,0,0.18)",
   },
 
-  pdfSubtitle: {
-    color: "#2563eb",
+  courseTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 20,
+    flexWrap: "wrap",
+    borderBottom: "2px solid #e5e7eb",
+    paddingBottom: 22,
+    marginBottom: 26,
   },
 
-  sectionBox: {
-    marginTop: 28,
-    padding: 22,
-    borderRadius: 22,
+  smallLabel: {
+    color: "#4f46e5",
+    fontWeight: 900,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+
+  courseTitle: {
+    fontSize: "clamp(34px,5vw,58px)",
+    margin: "8px 0",
+  },
+
+  level: {
+    fontSize: 20,
+    color: "#475569",
+    fontWeight: 900,
+  },
+
+  scoreBadge: {
+    background: "#eef2ff",
+    color: "#4338ca",
+    padding: "14px 18px",
+    borderRadius: 18,
+    fontWeight: 900,
+    height: "fit-content",
+  },
+
+  section: {
+    marginTop: 26,
+    padding: 24,
+    borderRadius: 24,
     background: "#f8fafc",
     border: "1px solid #e2e8f0",
   },
 
-  sectionBoxTitle: {
+  sectionTitle: {
     marginTop: 0,
-    color: "#0f172a",
+    fontSize: 28,
   },
 
-  pre: {
+  text: {
     whiteSpace: "pre-wrap",
     lineHeight: 1.75,
-    fontSize: 16,
-    color: "#0f172a",
+    fontSize: 17,
   },
 
-  features: {
-    padding: "80px 24px",
-    background: "linear-gradient(180deg,#020617,#0f172a)",
-  },
-
-  sectionTitle: {
-    textAlign: "center",
-    fontSize: "clamp(34px,5vw,54px)",
-  },
-
-  featureGrid: {
-    maxWidth: 1100,
-    margin: "40px auto 0",
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-    gap: 20,
-  },
-
-  featureCard: {
-    background: "rgba(255,255,255,0.09)",
-    border: "1px solid rgba(255,255,255,0.14)",
-    padding: 26,
+  schemaBox: {
+    marginTop: 26,
+    padding: 24,
     borderRadius: 24,
+    background: "#fff7ed",
+    border: "2px solid #fb923c",
+  },
+
+  fakeBoard: {
+    position: "relative",
+    height: 250,
+    background:
+      "linear-gradient(#e5e7eb 1px, transparent 1px), linear-gradient(90deg,#e5e7eb 1px, transparent 1px)",
+    backgroundSize: "28px 28px",
+    borderRadius: 20,
+    margin: "18px 0",
+    overflow: "hidden",
+  },
+
+  axisX: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    top: "50%",
+    height: 3,
+    background: "#111827",
+  },
+
+  axisY: {
+    position: "absolute",
+    top: 20,
+    bottom: 20,
+    left: "50%",
+    width: 3,
+    background: "#111827",
+  },
+
+  curve: {
+    position: "absolute",
+    left: "20%",
+    top: "22%",
+    width: "58%",
+    height: "58%",
+    borderTop: "5px solid #ec4899",
+    borderRight: "5px solid #ec4899",
+    borderRadius: "100% 40% 100% 40%",
+    transform: "rotate(-15deg)",
+  },
+
+  quizEndButton: {
+    display: "block",
+    marginTop: 30,
+    padding: 18,
+    borderRadius: 18,
+    background: "#4f46e5",
+    color: "white",
     fontWeight: 900,
+    textDecoration: "none",
+    textAlign: "center",
   },
 };
