@@ -3,37 +3,45 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.TOGETHER_API_KEY;
+
     if (!apiKey) {
-      return NextResponse.json({ error: "Clé Together manquante" });
+      return NextResponse.json({
+        title: "Quiz local",
+        questions: fallbackQuiz(),
+      });
     }
 
-    const { matiere, niveau, chapitre, mode } = await req.json();
+    const { matiere, niveau, chapitre, count = 10 } = await req.json();
 
     const prompt = `
-Crée un quiz scolaire en français.
+Génère un quiz scolaire en français.
 
-Matière: ${matiere}
-Niveau: ${niveau}
-Chapitre: ${chapitre}
-Mode: ${mode === "evaluation" ? "évaluation finale" : "quiz d'entraînement"}
+Matière : ${matiere}
+Niveau : ${niveau}
+Chapitre : ${chapitre}
 
-Réponds UNIQUEMENT en JSON valide, sans texte autour.
+Réponds UNIQUEMENT avec un JSON valide.
+Aucun texte avant ou après.
 
-Format exact:
+Format exact :
 {
-  "title": "Titre du quiz",
+  "title": "Quiz sur ${chapitre}",
   "questions": [
     {
-      "question": "Question ici",
-      "choices": ["A", "B", "C", "D"],
+      "question": "Question claire",
+      "choices": ["Choix A", "Choix B", "Choix C", "Choix D"],
       "answer": 0,
-      "explanation": "Correction courte et claire"
+      "explanation": "Correction courte",
+      "difficulty": "facile"
     }
   ]
 }
 
-Nombre de questions: ${mode === "evaluation" ? 10 : 6}
-Niveau progressif.
+Règles :
+- ${count} questions
+- 4 choix par question
+- answer est un nombre entre 0 et 3
+- niveau progressif
 `;
 
     const response = await fetch("https://api.together.xyz/v1/chat/completions", {
@@ -45,20 +53,72 @@ Niveau progressif.
       body: JSON.stringify({
         model: "mistralai/Mistral-7B-Instruct-v0.2",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.9,
+        temperature: 0.6,
         max_tokens: 2200,
       }),
     });
 
     const result = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json({
+        title: "Quiz local",
+        questions: fallbackQuiz(),
+      });
+    }
+
     const text = result.choices?.[0]?.message?.content || "";
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
 
-    const jsonStart = text.indexOf("{");
-    const jsonEnd = text.lastIndexOf("}");
-    const clean = text.slice(jsonStart, jsonEnd + 1);
+    if (start === -1 || end === -1) {
+      return NextResponse.json({
+        title: "Quiz local",
+        questions: fallbackQuiz(),
+      });
+    }
 
-    return NextResponse.json(JSON.parse(clean));
+    const clean = text.slice(start, end + 1);
+    const parsed = JSON.parse(clean);
+
+    if (!parsed.questions || !Array.isArray(parsed.questions)) {
+      return NextResponse.json({
+        title: "Quiz local",
+        questions: fallbackQuiz(),
+      });
+    }
+
+    return NextResponse.json(parsed);
   } catch {
-    return NextResponse.json({ error: "Erreur génération quiz" });
+    return NextResponse.json({
+      title: "Quiz local",
+      questions: fallbackQuiz(),
+    });
   }
+}
+
+function fallbackQuiz() {
+  return [
+    {
+      question: "Que mesure une force en physique ?",
+      choices: ["Une masse", "Une interaction", "Une température", "Une vitesse"],
+      answer: 1,
+      explanation: "Une force modélise une interaction entre deux systèmes.",
+      difficulty: "facile",
+    },
+    {
+      question: "Quelle est l’unité de la force ?",
+      choices: ["Joule", "Newton", "Watt", "Pascal"],
+      answer: 1,
+      explanation: "L’unité de la force est le newton, noté N.",
+      difficulty: "facile",
+    },
+    {
+      question: "Quelle relation correspond à la deuxième loi de Newton ?",
+      choices: ["P = mg", "F = ma", "E = mc²", "U = RI"],
+      answer: 1,
+      explanation: "La deuxième loi de Newton s’écrit généralement F = m × a.",
+      difficulty: "moyen",
+    },
+  ];
 }
