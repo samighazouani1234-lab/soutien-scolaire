@@ -1,95 +1,139 @@
 import { NextResponse } from "next/server";
 
+const MODEL =
+  process.env.TOGETHER_MODEL || "meta-llama/Llama-3.3-70B-Instruct-Turbo";
+
 export async function POST(req: Request) {
-  const { topic } = await req.json();
+  try {
+    const apiKey = process.env.TOGETHER_API_KEY;
 
-  return NextResponse.json({
-    content: `
-📘 CHAPITRE : ${topic}
+    const { matiere, niveau, chapitre } = await req.json();
 
-🎯 Objectifs du cours
-- Comprendre les notions essentielles du chapitre
-- Savoir appliquer les méthodes
-- S'entraîner avec des exercices progressifs
-- Vérifier ses acquis avec une évaluation
+    if (!apiKey) {
+      return NextResponse.json({
+        content: fallbackCourse(matiere, niveau, chapitre),
+      });
+    }
 
-━━━━━━━━━━━━━━━━━━━━
+    const prompt = `
+Tu es un professeur expert et un concepteur de cours premium.
 
-1️⃣ COURS DÉTAILLÉ
+Crée un cours scolaire en français.
 
-Définition :
-Le chapitre "${topic}" doit être compris étape par étape. On commence par identifier les notions importantes, puis on apprend les méthodes de résolution.
+Matière : ${matiere}
+Niveau : ${niveau}
+Chapitre : ${chapitre}
 
-Méthode générale :
-1. Lire attentivement l’énoncé
-2. Repérer les données utiles
-3. Choisir la bonne formule ou méthode
-4. Faire les calculs proprement
-5. Vérifier le résultat
+Réponds avec ces séparateurs EXACTS :
 
-Exemple expliqué :
-On applique la méthode sur un exercice simple, puis on augmente progressivement la difficulté.
+### INTRODUCTION
+Une introduction claire, motivante et courte.
 
-━━━━━━━━━━━━━━━━━━━━
+### OBJECTIFS
+4 à 6 objectifs précis.
 
-2️⃣ EXERCICES AUTOMATIQUES
+### COURS
+Cours détaillé, progressif, avec définitions, propriétés, formules si nécessaire et explications simples.
 
-🟢 Exercice 1 — Facile
-Explique avec tes mots la notion principale du chapitre "${topic}".
+### METHODES
+Méthodes étape par étape pour résoudre les exercices du chapitre.
 
-🟡 Exercice 2 — Moyen
-Résous un exercice simple lié au chapitre "${topic}".
+### EXEMPLES
+Exemples corrigés courts et clairs.
 
-🔴 Exercice 3 — Difficile
-Résous un problème complet en plusieurs étapes.
+### EXERCICES
+5 exercices progressifs, sans QCM :
+- facile
+- moyen
+- difficile
+- type examen
+- défi
 
-━━━━━━━━━━━━━━━━━━━━
+### A_RETENIR
+Résumé clair et utile.
 
-3️⃣ CORRECTIONS
+### VIDEO
+Script court pour une vidéo pédagogique : titre, durée, plan minute par minute.
 
-✅ Correction exercice 1 :
-Il faut donner une définition claire, avec un exemple simple.
+Règles :
+- Ne mets pas de quiz QCM dans le cours.
+- Ne mets pas de JSON.
+- Ne mets pas de message d'erreur.
+- Adapte le vocabulaire au niveau ${niveau}.
+`;
 
-✅ Correction exercice 2 :
-On applique la méthode du cours :
-- on identifie les données
-- on choisit la méthode
-- on calcule
-- on vérifie
+    const response = await fetch("https://api.together.xyz/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.65,
+        max_tokens: 3200,
+      }),
+    });
 
-✅ Correction exercice 3 :
-La correction doit détailler chaque étape du raisonnement.
+    const result = await response.json();
 
-━━━━━━━━━━━━━━━━━━━━
+    if (!response.ok) {
+      return NextResponse.json({
+        content: fallbackCourse(matiere, niveau, chapitre),
+      });
+    }
 
-4️⃣ ÉVALUATION DU CHAPITRE
+    return NextResponse.json({
+      content:
+        result?.choices?.[0]?.message?.content ||
+        fallbackCourse(matiere, niveau, chapitre),
+    });
+  } catch {
+    return NextResponse.json({
+      content: fallbackCourse("Mathématiques", "Terminale", "Limites"),
+    });
+  }
+}
 
-Question 1 :
-Quelle est la définition principale du chapitre "${topic}" ?
+function fallbackCourse(matiere = "Mathématiques", niveau = "Terminale", chapitre = "Limites") {
+  return `### INTRODUCTION
+Bienvenue dans ce cours sur ${chapitre}. L’objectif est de comprendre les idées principales, de savoir les appliquer et de progresser avec des exercices gradués.
 
-Question 2 :
-Quelle méthode faut-il utiliser pour résoudre un exercice ?
+### OBJECTIFS
+- Comprendre les notions essentielles du chapitre.
+- Savoir reconnaître les situations classiques.
+- Appliquer une méthode claire.
+- S’entraîner avec des exercices progressifs.
+- Être capable d’expliquer son raisonnement.
 
-Question 3 :
-Résous un exercice d’application.
+### COURS
+Le chapitre ${chapitre} en ${matiere} demande d’abord de maîtriser les définitions. Une fois les notions comprises, on applique les propriétés et les méthodes dans des exercices. La clé est de ne pas apprendre uniquement par cœur : il faut comprendre pourquoi chaque étape est utilisée.
 
-Question 4 :
-Explique ton raisonnement.
+### METHODES
+1. Lire précisément l’énoncé.
+2. Identifier les données utiles.
+3. Repérer la notion du cours concernée.
+4. Choisir la méthode adaptée.
+5. Rédiger chaque étape clairement.
+6. Vérifier que la réponse est cohérente.
 
-━━━━━━━━━━━━━━━━━━━━
+### EXEMPLES
+Exemple guidé :
+On repère la définition utile, puis on applique la propriété du cours. On simplifie progressivement et on conclut par une phrase claire.
 
-5️⃣ BARÈME /10
+### EXERCICES
+1. Facile : donner la définition principale du chapitre.
+2. Moyen : appliquer la méthode sur un exemple direct.
+3. Difficile : résoudre un exercice avec plusieurs étapes.
+4. Type examen : rédiger une solution complète.
+5. Défi : expliquer la méthode à un autre élève.
 
-- Définitions : 2 points
-- Méthode : 2 points
-- Calculs / application : 3 points
-- Raisonnement : 2 points
-- Présentation : 1 point
+### A_RETENIR
+Pour réussir ${chapitre}, il faut comprendre les définitions, appliquer les méthodes et corriger ses erreurs.
 
-━━━━━━━━━━━━━━━━━━━━
-
-📌 Conseil :
-Relis le cours, refais les exercices sans regarder les corrections, puis passe à l’évaluation.
-`
-  });
+### VIDEO
+Titre : Comprendre ${chapitre}
+Durée : 6 minutes
+Plan : introduction, définition, méthode, exemple, résumé.`;
 }
