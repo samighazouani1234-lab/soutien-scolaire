@@ -31,27 +31,38 @@ export default function Home() {
       setAuthReady(true);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-    });
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user || null);
+      }
+    );
 
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   const niveaux = useMemo(() => {
     if (!matiere) return [];
+
     const selected = (data as any)[matiere];
     if (!selected) return [];
-    return Object.values(selected).flatMap((category: any) => Object.keys(category));
+
+    return Object.values(selected).flatMap((category: any) =>
+      Object.keys(category)
+    );
   }, [matiere]);
 
   const chapitres = useMemo(() => {
     if (!matiere || !niveau) return [];
+
     const selected = (data as any)[matiere];
     if (!selected) return [];
 
     for (const category in selected) {
-      if (selected[category][niveau]) return selected[category][niveau];
+      if (selected[category][niveau]) {
+        return selected[category][niveau];
+      }
     }
 
     return [];
@@ -59,6 +70,7 @@ export default function Home() {
 
   function getSection(title: string) {
     if (!course) return "";
+
     const regex = new RegExp(`### ${title}([\\s\\S]*?)(?=### |$)`);
     return course.match(regex)?.[1]?.trim() || "";
   }
@@ -86,8 +98,11 @@ export default function Home() {
 
     setLoading(false);
 
-    if (error) alert(error.message);
-    else alert("Compte créé. Tu peux maintenant te connecter.");
+    if (error) {
+      alert(error.message);
+    } else {
+      alert("Compte créé. Tu peux maintenant te connecter.");
+    }
   }
 
   async function handleLogin() {
@@ -108,8 +123,11 @@ export default function Home() {
 
     setLoading(false);
 
-    if (error) alert(error.message);
-    else setUser(data.user);
+    if (error) {
+      alert(error.message);
+    } else {
+      setUser(data.user);
+    }
   }
 
   async function handleLogout() {
@@ -136,25 +154,39 @@ export default function Home() {
     setCourse("");
 
     try {
-      const res = await fetch("/api/generate-course", {
+      const res = await fetch("/api/course", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ matiere, niveau, chapitre })
+        body: JSON.stringify({
+          matiere,
+          niveau,
+          chapitre,
+        }),
       });
 
       const json = await res.json();
-      const content = json.content || "Erreur génération du cours.";
+      const content =
+        json.content ||
+        "### INTRODUCTION\nLe cours n'a pas pu être généré. Réessaie dans quelques instants.";
+
       setCourse(content);
 
-      localStorage.setItem(`eduai-course-${matiere}-${niveau}-${chapitre}`, content);
+      localStorage.setItem(
+        `eduai-course-${matiere}-${niveau}-${chapitre}`,
+        content
+      );
 
       setTimeout(() => {
-        document.getElementById("cours")?.scrollIntoView({ behavior: "smooth" });
+        document.getElementById("cours")?.scrollIntoView({
+          behavior: "smooth",
+        });
       }, 300);
     } catch {
-      setCourse("### INTRODUCTION\nErreur temporaire. Réessaie dans quelques instants.");
+      setCourse(
+        "### INTRODUCTION\nLe cours n'a pas pu être généré. Réessaie dans quelques instants."
+      );
     }
 
     setLoading(false);
@@ -167,27 +199,22 @@ export default function Home() {
 
   const quizUrl = `/quiz?matiere=${encodeURIComponent(
     matiere || "Mathématiques"
-  )}&niveau=${encodeURIComponent(niveau || "Terminale")}&chapitre=${encodeURIComponent(
-    chapitre || "Limites"
-  )}`;
+  )}&niveau=${encodeURIComponent(
+    niveau || "Terminale"
+  )}&chapitre=${encodeURIComponent(chapitre || "Limites")}`;
 
   return (
     <>
       <style>{`
         @keyframes floatGlow {
-          0% { transform: translateY(0px) scale(1); opacity: .7; }
+          0% { transform: translateY(0px) scale(1); opacity: .75; }
           50% { transform: translateY(-18px) scale(1.04); opacity: 1; }
-          100% { transform: translateY(0px) scale(1); opacity: .7; }
-        }
-
-        @keyframes shine {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
+          100% { transform: translateY(0px) scale(1); opacity: .75; }
         }
 
         @keyframes pulseSoft {
           0%, 100% { box-shadow: 0 0 0 rgba(99,102,241,0); }
-          50% { box-shadow: 0 0 45px rgba(99,102,241,.36); }
+          50% { box-shadow: 0 0 45px rgba(99,102,241,.30); }
         }
 
         @media print {
@@ -215,9 +242,15 @@ export default function Home() {
             <div style={styles.logo}>🕌 EduAI</div>
 
             <div style={styles.navLinks}>
-              <a href="#generator" style={styles.link}>Générateur</a>
-              <a href={user ? quizUrl : "#login"} style={styles.link}>Quiz</a>
-              <a href="#avantages" style={styles.link}>Avantages</a>
+              <a href="#generator" style={styles.link}>
+                Générateur
+              </a>
+              <a href={user ? quizUrl : "#login"} style={styles.link}>
+                Quiz
+              </a>
+              <a href="#avantages" style={styles.link}>
+                Avantages
+              </a>
 
               {user ? (
                 <button onClick={handleLogout} style={styles.logout}>
@@ -236,12 +269,12 @@ export default function Home() {
               <span style={styles.badge}>✨ Plateforme scolaire IA premium</span>
 
               <h1 style={styles.title}>
-                Apprends plus vite avec des cours IA élégants.
+                Apprends plus vite avec une IA scolaire.
               </h1>
 
               <p style={styles.subtitle}>
-                Génère des cours structurés, des exercices progressifs, un quiz interactif
-                et un PDF propre en quelques secondes.
+                Génère des cours structurés, des exercices progressifs, des quiz
+                interactifs et des PDF propres en quelques secondes.
               </p>
 
               <div style={styles.styleCards}>
@@ -300,7 +333,9 @@ export default function Home() {
                   >
                     <option value="">Choisir une matière</option>
                     {Object.keys(data).map((m) => (
-                      <option key={m} value={m}>{m}</option>
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
                     ))}
                   </select>
 
@@ -315,7 +350,9 @@ export default function Home() {
                   >
                     <option value="">Choisir un niveau</option>
                     {niveaux.map((n: any) => (
-                      <option key={n} value={n}>{n}</option>
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
                     ))}
                   </select>
 
@@ -329,7 +366,9 @@ export default function Home() {
                   >
                     <option value="">Choisir un chapitre</option>
                     {chapitres.map((c: any) => (
-                      <option key={c} value={c}>{c}</option>
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
                     ))}
                   </select>
 
@@ -393,6 +432,7 @@ export default function Home() {
 
         <section id="avantages" style={styles.features} className="no-print">
           <h2 style={styles.featuresTitle}>Une expérience scolaire moderne</h2>
+
           <div style={styles.featureGrid}>
             <div style={styles.feature}>⚡ Génération rapide</div>
             <div style={styles.feature}>🎯 Chapitres ciblés</div>
@@ -418,7 +458,9 @@ function Section({
 
   return (
     <section style={styles.section}>
-      <h2 style={styles.sectionTitle}>{icon} {title}</h2>
+      <h2 style={styles.sectionTitle}>
+        {icon} {title}
+      </h2>
       <Text content={content} />
     </section>
   );
@@ -526,7 +568,7 @@ const styles: any = {
   },
   title: {
     fontSize: "clamp(52px,8vw,92px)",
-    lineHeight: .96,
+    lineHeight: 0.96,
     margin: "26px 0",
     letterSpacing: -4,
   },
@@ -584,8 +626,6 @@ const styles: any = {
     fontWeight: 900,
     cursor: "pointer",
     fontSize: 16,
-    position: "relative",
-    overflow: "hidden",
   },
   secondaryButton: {
     width: "100%",
@@ -664,7 +704,8 @@ const styles: any = {
     color: "#0f172a",
     borderRadius: 36,
     padding: 40,
-    boxShadow: "0 12px 0 rgba(0,0,0,.15), 0 35px 90px rgba(15,23,42,.16)",
+    boxShadow:
+      "0 12px 0 rgba(0,0,0,.15), 0 35px 90px rgba(15,23,42,.16)",
   },
   courseTop: {
     display: "flex",
