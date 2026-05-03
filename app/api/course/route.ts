@@ -23,10 +23,9 @@ export async function POST(req: Request) {
     const prompt = `
 Tu es un professeur français expert.
 
-Crée un cours scolaire sérieux et fiable.
+Crée un cours scolaire sérieux, fiable, détaillé, adapté au niveau ${niveau}.
 
 Matière : ${matiere}
-Niveau : ${niveau}
 Chapitre : ${chapitre}
 
 Réponds uniquement avec ces titres exacts :
@@ -47,7 +46,7 @@ Règles :
 - cours détaillé
 - 6 exemples corrigés
 - 15 exercices corrigés
-- contenu adapté au niveau ${niveau}
+- contenu adapté au chapitre exact
 `;
 
     const response = await fetch("https://api.together.xyz/v1/chat/completions", {
@@ -71,6 +70,7 @@ Règles :
     }
 
     const content = result?.choices?.[0]?.message?.content;
+
     return NextResponse.json({
       content: typeof content === "string" && content.trim()
         ? sanitizeCourse(content)
@@ -110,11 +110,7 @@ Ce cours porte sur ${chapitre} en ${matiere}, niveau ${niveau}. Il aide à compr
 Le chapitre ${chapitre} doit être travaillé avec méthode. Il faut lire l’énoncé, repérer les données, choisir une propriété, vérifier ses conditions et rédiger une conclusion.
 
 ### TABLEAUX
-| Élément | Rôle |
-|---|---|
-| Définition | Comprendre |
-| Propriété | Résoudre |
-| Méthode | Organiser |
+Le site affiche un tableau de synthèse propre et adapté au chapitre.
 
 ### METHODES
 1. Lire l’énoncé.
