@@ -1,28 +1,8 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
-
-const MATIERES: Record<string, Record<string, string[]>> = {
-  Mathématiques: {
-    "6e": ["Fractions", "Proportionnalité", "Géométrie"],
-    "5e": ["Nombres relatifs", "Triangles", "Pourcentages"],
-    "4e": ["Théorème de Pythagore", "Puissances", "Statistiques"],
-    "3e": ["Équations", "Fonctions", "Théorème de Thalès"],
-    Seconde: ["Fonctions", "Vecteurs", "Probabilités"],
-    Première: ["Dérivation", "Suites", "Produit scalaire"],
-    Terminale: ["Limites", "Fonction logarithme", "Équations différentielles", "Loi binomiale"],
-  },
-  Physique: {
-    Seconde: ["Mouvement", "Lumière", "Signaux"],
-    Première: ["Énergie", "Ondes", "Électricité"],
-    Terminale: ["Deuxième loi de Newton", "Lentilles minces", "Mécanique quantique"],
-  },
-  Chimie: {
-    Seconde: ["Atomes", "Solutions", "Transformation chimique"],
-    Première: ["Dosage", "Oxydoréduction", "Molécules"],
-    Terminale: ["Acides bases", "Piles", "Cinétique chimique"],
-  },
-};
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { coursesData } from "../data/courses";
+import { getSupabaseClient } from "../lib/supabase";
 
 type Exercise = {
   id: number;
@@ -40,6 +20,12 @@ type VideoLink = {
 };
 
 export default function Page() {
+  const [user, setUser] = useState<any>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
   const [matiere, setMatiere] = useState("Mathématiques");
   const [niveau, setNiveau] = useState("Terminale");
   const [chapitre, setChapitre] = useState("Limites");
@@ -47,8 +33,28 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState<Record<number, boolean>>({});
 
-  const niveaux = Object.keys(MATIERES[matiere] || {});
-  const chapitres = MATIERES[matiere]?.[niveau] || [];
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+
+    if (!supabase) {
+      setAuthReady(true);
+      return;
+    }
+
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+      setAuthReady(true);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  const niveaux = Object.keys(coursesData[matiere] || {});
+  const chapitres = coursesData[matiere]?.[niveau] || [];
 
   const exercises = useMemo(
     () => buildExercises(matiere, niveau, chapitre),
@@ -59,6 +65,8 @@ export default function Page() {
     () => buildVideoLinks(matiere, niveau, chapitre),
     [matiere, niveau, chapitre]
   );
+
+  const quizUrl = `/quiz?matiere=${encodeURIComponent(matiere)}&niveau=${encodeURIComponent(niveau)}&chapitre=${encodeURIComponent(chapitre)}`;
 
   function getSection(title: string) {
     const clean = String(course || "")
@@ -76,7 +84,55 @@ export default function Page() {
     return clean.match(regex)?.[1]?.trim() || "";
   }
 
+  async function handleAuth() {
+    const supabase = getSupabaseClient();
+
+    if (!supabase) {
+      alert("Supabase n'est pas configuré. Vérifie NEXT_PUBLIC_SUPABASE_URL et NEXT_PUBLIC_SUPABASE_ANON_KEY dans Vercel.");
+      return;
+    }
+
+    if (!email.trim() || password.length < 6) {
+      alert("Entre un email valide et un mot de passe de 6 caractères minimum.");
+      return;
+    }
+
+    setLoading(true);
+
+    const result =
+      authMode === "login"
+        ? await supabase.auth.signInWithPassword({ email: email.trim(), password })
+        : await supabase.auth.signUp({ email: email.trim(), password });
+
+    setLoading(false);
+
+    if (result.error) {
+      alert(result.error.message);
+      return;
+    }
+
+    if (authMode === "signup") {
+      alert("Compte créé. Si Supabase demande une confirmation email, confirme ton email puis connecte-toi.");
+    }
+
+    setUser(result.data.user || null);
+  }
+
+  async function logout() {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    await supabase.auth.signOut();
+    setUser(null);
+    setCourse("");
+  }
+
   async function generateCourse() {
+    if (!user) {
+      alert("Connecte-toi pour générer un cours.");
+      return;
+    }
+
     setLoading(true);
     setCourse("");
 
@@ -143,7 +199,15 @@ export default function Page() {
 
           <nav style={styles.nav}>
             <b style={styles.logo}>🕌 EduAI</b>
-            <a href="/quiz" style={styles.navButton}>Quiz</a>
+
+            <div style={styles.navActions}>
+              <a href={user ? quizUrl : "#connexion"} style={styles.navButton}>Quiz</a>
+              {user ? (
+                <button onClick={logout} style={styles.logoutButton}>Déconnexion</button>
+              ) : (
+                <a href="#connexion" style={styles.navButtonLight}>Connexion</a>
+              )}
+            </div>
           </nav>
 
           <div style={styles.heroGrid}>
@@ -151,68 +215,112 @@ export default function Page() {
               <span style={styles.badge}>✨ Cours IA Premium</span>
               <h1 style={styles.title}>Cours détaillés, graphes, vidéos et 50 exercices.</h1>
               <p style={styles.subtitle}>
-                Sélectionne une matière, un niveau et un chapitre. Le site génère un cours structuré avec graphes,
-                liens vidéo, parcours élève et exercices progressifs.
+                Connexion utilisateur, génération IA, graphes visibles, liens vidéo cliquables,
+                parcours élève, badges et exercices progressifs.
               </p>
 
               <div style={styles.styleCards}>
+                <div style={styles.styleCard}>🔐 Connexion utilisateur</div>
                 <div style={styles.styleCard}>📈 Graphe visible</div>
                 <div style={styles.styleCard}>🎬 Vidéos cliquables</div>
                 <div style={styles.styleCard}>✍️ 50 exercices</div>
               </div>
             </div>
 
-            <div style={styles.panel}>
-              <h2>Créer un cours</h2>
+            <div id="connexion" style={styles.panel}>
+              {!authReady ? (
+                <h2>Chargement...</h2>
+              ) : !user ? (
+                <>
+                  <h2>{authMode === "login" ? "Connexion" : "Créer un compte"}</h2>
+                  <p style={styles.muted}>
+                    Connecte-toi pour générer les cours et accéder au quiz.
+                  </p>
 
-              <select
-                style={styles.input}
-                value={matiere}
-                onChange={(event) => {
-                  const m = event.target.value;
-                  const firstNiveau = Object.keys(MATIERES[m])[0];
-                  setMatiere(m);
-                  setNiveau(firstNiveau);
-                  setChapitre(MATIERES[m][firstNiveau][0]);
-                  setCourse("");
-                }}
-              >
-                {Object.keys(MATIERES).map((m) => (
-                  <option key={m}>{m}</option>
-                ))}
-              </select>
+                  <input
+                    style={styles.input}
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                  />
 
-              <select
-                style={styles.input}
-                value={niveau}
-                onChange={(event) => {
-                  const n = event.target.value;
-                  setNiveau(n);
-                  setChapitre(MATIERES[matiere][n][0]);
-                  setCourse("");
-                }}
-              >
-                {niveaux.map((n) => (
-                  <option key={n}>{n}</option>
-                ))}
-              </select>
+                  <input
+                    style={styles.input}
+                    type="password"
+                    placeholder="Mot de passe"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
 
-              <select
-                style={styles.input}
-                value={chapitre}
-                onChange={(event) => {
-                  setChapitre(event.target.value);
-                  setCourse("");
-                }}
-              >
-                {chapitres.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
+                  <button style={styles.primaryButton} onClick={handleAuth}>
+                    {loading ? "Patiente..." : authMode === "login" ? "Se connecter" : "Créer le compte"}
+                  </button>
 
-              <button style={styles.primaryButton} onClick={generateCourse}>
-                {loading ? "Génération..." : "✨ Générer le cours"}
-              </button>
+                  <button
+                    style={styles.secondaryButton}
+                    onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")}
+                  >
+                    {authMode === "login" ? "Créer un compte" : "J'ai déjà un compte"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p style={styles.connected}>✅ Connecté : {user.email}</p>
+                  <h2>Créer un cours</h2>
+
+                  <select
+                    style={styles.input}
+                    value={matiere}
+                    onChange={(event) => {
+                      const m = event.target.value;
+                      const firstNiveau = Object.keys(coursesData[m])[0];
+                      setMatiere(m);
+                      setNiveau(firstNiveau);
+                      setChapitre(coursesData[m][firstNiveau][0]);
+                      setCourse("");
+                    }}
+                  >
+                    {Object.keys(coursesData).map((m) => (
+                      <option key={m}>{m}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    style={styles.input}
+                    value={niveau}
+                    onChange={(event) => {
+                      const n = event.target.value;
+                      setNiveau(n);
+                      setChapitre(coursesData[matiere][n][0]);
+                      setCourse("");
+                    }}
+                  >
+                    {niveaux.map((n) => (
+                      <option key={n}>{n}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    style={styles.input}
+                    value={chapitre}
+                    onChange={(event) => {
+                      setChapitre(event.target.value);
+                      setCourse("");
+                    }}
+                  >
+                    {chapitres.map((c) => (
+                      <option key={c}>{c}</option>
+                    ))}
+                  </select>
+
+                  <button style={styles.primaryButton} onClick={generateCourse}>
+                    {loading ? "Génération..." : "✨ Générer le cours"}
+                  </button>
+
+                  <a href={quizUrl} style={styles.quizButton}>🧠 Lancer le quiz interactif</a>
+                </>
+              )}
             </div>
           </div>
         </section>
@@ -552,13 +660,36 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 30,
     fontWeight: 900,
   },
+  navActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
+  },
   navButton: {
+    background: "#4f46e5",
+    color: "white",
+    padding: "12px 18px",
+    borderRadius: 999,
+    textDecoration: "none",
+    fontWeight: 900,
+  },
+  navButtonLight: {
     background: "white",
     color: "#020617",
     padding: "12px 18px",
     borderRadius: 999,
     textDecoration: "none",
     fontWeight: 900,
+  },
+  logoutButton: {
+    background: "#ef4444",
+    color: "white",
+    padding: "12px 18px",
+    borderRadius: 999,
+    border: "none",
+    fontWeight: 900,
+    cursor: "pointer",
   },
   heroGrid: {
     maxWidth: 1240,
@@ -609,6 +740,17 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 34,
     boxShadow: "0 35px 100px rgba(0,0,0,.45)",
   },
+  muted: {
+    color: "#64748b",
+    lineHeight: 1.5,
+  },
+  connected: {
+    background: "#dcfce7",
+    color: "#166534",
+    padding: 12,
+    borderRadius: 14,
+    fontWeight: 900,
+  },
   input: {
     width: "100%",
     padding: 16,
@@ -629,6 +771,29 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 900,
     cursor: "pointer",
     fontSize: 16,
+  },
+  secondaryButton: {
+    width: "100%",
+    marginTop: 12,
+    padding: 15,
+    border: "none",
+    borderRadius: 18,
+    background: "#020617",
+    color: "white",
+    fontWeight: 900,
+    cursor: "pointer",
+    fontSize: 16,
+  },
+  quizButton: {
+    display: "block",
+    marginTop: 12,
+    padding: 15,
+    borderRadius: 18,
+    background: "#111827",
+    color: "white",
+    fontWeight: 900,
+    textDecoration: "none",
+    textAlign: "center",
   },
   courseWrap: {
     background: "#efe7db",
