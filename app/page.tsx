@@ -1,6 +1,6 @@
-*"use client";
+"use client";
 
-import { useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 
 const MATIERES: Record<string, Record<string, string[]>> = {
   Mathématiques: {
@@ -33,6 +33,12 @@ type Exercise = {
   detailedCorrection: string;
 };
 
+type VideoLink = {
+  href: string;
+  title: string;
+  desc: string;
+};
+
 export default function Page() {
   const [matiere, setMatiere] = useState("Mathématiques");
   const [niveau, setNiveau] = useState("Terminale");
@@ -43,8 +49,16 @@ export default function Page() {
 
   const niveaux = Object.keys(MATIERES[matiere] || {});
   const chapitres = MATIERES[matiere]?.[niveau] || [];
-  const exercises = buildExercises(matiere, niveau, chapitre);
-  const videoLinks = buildVideoLinks(matiere, niveau, chapitre);
+
+  const exercises = useMemo(
+    () => buildExercises(matiere, niveau, chapitre),
+    [matiere, niveau, chapitre]
+  );
+
+  const videoLinks = useMemo(
+    () => buildVideoLinks(matiere, niveau, chapitre),
+    [matiere, niveau, chapitre]
+  );
 
   function getSection(title: string) {
     const clean = String(course || "")
@@ -251,7 +265,7 @@ function Section({ title, content }: { title: string; content: string }) {
   );
 }
 
-function VideoBlock({ links }: { links: { href: string; title: string; desc: string }[] }) {
+function VideoBlock({ links }: { links: VideoLink[] }) {
   return (
     <section style={styles.section}>
       <h2>🎬 Cours vidéo adaptés</h2>
@@ -370,7 +384,7 @@ function Exercises({
 }: {
   exercises: Exercise[];
   open: Record<number, boolean>;
-  setOpen: React.Dispatch<React.SetStateAction<Record<number, boolean>>>;
+  setOpen: (value: Record<number, boolean> | ((previous: Record<number, boolean>) => Record<number, boolean>)) => void;
 }) {
   return (
     <section style={styles.section}>
@@ -431,7 +445,7 @@ function buildExercises(matiere: string, niveau: string, chapitre: string): Exer
   });
 }
 
-function buildVideoLinks(matiere: string, niveau: string, chapitre: string) {
+function buildVideoLinks(matiere: string, niveau: string, chapitre: string): VideoLink[] {
   const query = encodeURIComponent(`${matiere} ${niveau} ${chapitre} cours exercices corrigés`);
   const query2 = encodeURIComponent(`${matiere} ${chapitre}`);
 
@@ -490,7 +504,7 @@ Correction détaillée : justifier les étapes.
 Comprendre, pratiquer, corriger.`;
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<string, CSSProperties> = {
   page: {
     minHeight: "100vh",
     background: "#090914",
