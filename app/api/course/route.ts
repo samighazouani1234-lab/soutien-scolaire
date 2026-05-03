@@ -4,10 +4,17 @@ const MODEL =
   process.env.TOGETHER_MODEL || "meta-llama/Llama-3.3-70B-Instruct-Turbo";
 
 export async function POST(req: Request) {
-  try {
-    const apiKey = process.env.TOGETHER_API_KEY;
+  let matiere = "Mathématiques";
+  let niveau = "Terminale";
+  let chapitre = "Limites";
 
-    const { matiere, niveau, chapitre } = await req.json();
+  try {
+    const body = await req.json();
+    matiere = body?.matiere || matiere;
+    niveau = body?.niveau || niveau;
+    chapitre = body?.chapitre || chapitre;
+
+    const apiKey = process.env.TOGETHER_API_KEY;
 
     if (!apiKey) {
       return NextResponse.json({
@@ -18,7 +25,7 @@ export async function POST(req: Request) {
     const prompt = `
 Tu es un professeur expert et un concepteur de cours premium.
 
-Crée un cours scolaire en français.
+Crée un cours scolaire complet en français.
 
 Matière : ${matiere}
 Niveau : ${niveau}
@@ -27,7 +34,7 @@ Chapitre : ${chapitre}
 Réponds avec ces séparateurs EXACTS :
 
 ### INTRODUCTION
-Une introduction claire, motivante et courte.
+Une introduction claire et motivante.
 
 ### OBJECTIFS
 4 à 6 objectifs précis.
@@ -79,61 +86,87 @@ Règles :
     const result = await response.json();
 
     if (!response.ok) {
+      console.error("Together API error:", result);
       return NextResponse.json({
         content: fallbackCourse(matiere, niveau, chapitre),
       });
     }
 
+    const content = result?.choices?.[0]?.message?.content;
+
+    if (!content || typeof content !== "string") {
+      return NextResponse.json({
+        content: fallbackCourse(matiere, niveau, chapitre),
+      });
+    }
+
+    return NextResponse.json({ content });
+  } catch (error) {
+    console.error("Course route error:", error);
+
     return NextResponse.json({
-      content:
-        result?.choices?.[0]?.message?.content ||
-        fallbackCourse(matiere, niveau, chapitre),
-    });
-  } catch {
-    return NextResponse.json({
-      content: fallbackCourse("Mathématiques", "Terminale", "Limites"),
+      content: fallbackCourse(matiere, niveau, chapitre),
     });
   }
 }
 
-function fallbackCourse(matiere = "Mathématiques", niveau = "Terminale", chapitre = "Limites") {
+function fallbackCourse(
+  matiere = "Mathématiques",
+  niveau = "Terminale",
+  chapitre = "Limites"
+) {
   return `### INTRODUCTION
-Bienvenue dans ce cours sur ${chapitre}. L’objectif est de comprendre les idées principales, de savoir les appliquer et de progresser avec des exercices gradués.
+Bienvenue dans ce cours sur ${chapitre}. L'objectif est de comprendre les idées principales, de savoir les appliquer et de progresser avec des exercices gradués.
 
 ### OBJECTIFS
 - Comprendre les notions essentielles du chapitre.
 - Savoir reconnaître les situations classiques.
 - Appliquer une méthode claire.
-- S’entraîner avec des exercices progressifs.
-- Être capable d’expliquer son raisonnement.
+- S'entraîner avec des exercices progressifs.
+- Être capable d'expliquer son raisonnement.
 
 ### COURS
-Le chapitre ${chapitre} en ${matiere} demande d’abord de maîtriser les définitions. Une fois les notions comprises, on applique les propriétés et les méthodes dans des exercices. La clé est de ne pas apprendre uniquement par cœur : il faut comprendre pourquoi chaque étape est utilisée.
+Le chapitre ${chapitre} en ${matiere} demande d'abord de maîtriser les définitions. Une fois les notions comprises, on applique les propriétés et les méthodes dans des exercices. La clé est de ne pas apprendre uniquement par cœur : il faut comprendre pourquoi chaque étape est utilisée.
+
+Pour réussir, il faut :
+- lire précisément l'énoncé ;
+- repérer les données importantes ;
+- choisir la bonne méthode ;
+- rédiger clairement ;
+- vérifier le résultat.
 
 ### METHODES
-1. Lire précisément l’énoncé.
+1. Lire l'énoncé sans se précipiter.
 2. Identifier les données utiles.
 3. Repérer la notion du cours concernée.
-4. Choisir la méthode adaptée.
-5. Rédiger chaque étape clairement.
-6. Vérifier que la réponse est cohérente.
+4. Choisir une méthode adaptée.
+5. Effectuer les calculs ou le raisonnement.
+6. Conclure avec une phrase claire.
 
 ### EXEMPLES
 Exemple guidé :
-On repère la définition utile, puis on applique la propriété du cours. On simplifie progressivement et on conclut par une phrase claire.
+On repère d'abord la définition utile du chapitre. Ensuite, on applique la propriété correspondante. Enfin, on simplifie et on conclut.
+
+Correction courte :
+La méthode est correcte si chaque étape est justifiée et si la réponse finale répond bien à la question.
 
 ### EXERCICES
-1. Facile : donner la définition principale du chapitre.
+1. Facile : donner la définition principale du chapitre ${chapitre}.
 2. Moyen : appliquer la méthode sur un exemple direct.
 3. Difficile : résoudre un exercice avec plusieurs étapes.
 4. Type examen : rédiger une solution complète.
-5. Défi : expliquer la méthode à un autre élève.
+5. Défi : expliquer la méthode à un autre élève avec tes propres mots.
 
 ### A_RETENIR
-Pour réussir ${chapitre}, il faut comprendre les définitions, appliquer les méthodes et corriger ses erreurs.
+Pour réussir ${chapitre}, il faut comprendre les définitions, appliquer les méthodes et corriger ses erreurs. L'entraînement régulier est essentiel.
 
 ### VIDEO
 Titre : Comprendre ${chapitre}
 Durée : 6 minutes
-Plan : introduction, définition, méthode, exemple, résumé.`;
+Plan :
+0:00 Introduction
+0:45 Définition importante
+2:00 Méthode
+3:30 Exemple corrigé
+5:30 Résumé final`;
 }
