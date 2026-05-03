@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-const MODEL = process.env.TOGETHER_MODEL || "meta-llama/Llama-3.3-70B-Instruct-Turbo";
+const MODEL =
+  process.env.TOGETHER_MODEL || "meta-llama/Llama-3.3-70B-Instruct-Turbo";
 
 export async function POST(req: Request) {
   let matiere = "Mathématiques";
@@ -9,117 +10,127 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    matiere = body?.matiere || matiere;
-    niveau = body?.niveau || niveau;
-    chapitre = body?.chapitre || chapitre;
+    matiere = String(body?.matiere || matiere);
+    niveau = String(body?.niveau || niveau);
+    chapitre = String(body?.chapitre || chapitre);
 
     const apiKey = process.env.TOGETHER_API_KEY;
-    if (!apiKey) return NextResponse.json({ content: fallbackCourse(matiere, niveau, chapitre) });
+
+    if (!apiKey) {
+      return NextResponse.json({ content: fallbackCourse(matiere, niveau, chapitre) });
+    }
 
     const prompt = `
-Tu es un professeur expert en ${matiere}. Crée un cours LONG, exigeant et adapté au niveau ${niveau} sur "${chapitre}".
+Tu es un professeur français expert.
 
-Réponds avec ces titres EXACTS :
+Crée un cours scolaire sérieux et fiable.
+
+Matière : ${matiere}
+Niveau : ${niveau}
+Chapitre : ${chapitre}
+
+Réponds uniquement avec ces titres exacts :
+
 ### INTRODUCTION
 ### OBJECTIFS
-### COURS_DETAILLE
+### COURS
 ### TABLEAUX
 ### METHODES
-### EXEMPLES_CORRIGES
-### EXERCICES_CORRIGES
+### EXEMPLES
+### EXERCICES
 ### A_RETENIR
 
-Contraintes :
-- Cours très détaillé, pas un résumé.
-- Adapté précisément au niveau ${niveau}.
-- Minimum 6 exemples corrigés.
-- Minimum 15 exercices corrigés dans la réponse IA.
-- Pas de quiz QCM ici.
-- Pas de markdown code.
+Règles :
+- pas de HTML
+- pas de JSON
+- pas de titre coupé comme _DETAILLE
+- cours détaillé
+- 6 exemples corrigés
+- 15 exercices corrigés
+- contenu adapté au niveau ${niveau}
 `;
 
     const response = await fetch("https://api.together.xyz/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: MODEL,
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.35,
-        max_tokens: 6500
-      })
+        temperature: 0.25,
+        max_tokens: 5200,
+      }),
     });
 
     const result = await response.json();
 
     if (!response.ok) {
-      console.error("Together course error:", result);
       return NextResponse.json({ content: fallbackCourse(matiere, niveau, chapitre) });
     }
 
     const content = result?.choices?.[0]?.message?.content;
     return NextResponse.json({
       content: typeof content === "string" && content.trim()
-        ? content
-        : fallbackCourse(matiere, niveau, chapitre)
+        ? sanitizeCourse(content)
+        : fallbackCourse(matiere, niveau, chapitre),
     });
-  } catch (error) {
-    console.error("Course API error:", error);
+  } catch {
     return NextResponse.json({ content: fallbackCourse(matiere, niveau, chapitre) });
   }
 }
 
+function sanitizeCourse(raw: string) {
+  return raw
+    .replace(/\r/g, "")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/<\/?[^>]+(>|$)/g, "")
+    .replaceAll("### COURS_DETAILLE", "### COURS")
+    .replaceAll("### COURS\n_DETAILLE", "### COURS")
+    .replaceAll("### EXEMPLES_CORRIGES", "### EXEMPLES")
+    .replaceAll("### EXERCICES_CORRIGES", "### EXERCICES")
+    .replace(/^_DETAILLE\s*$/gm, "")
+    .trim();
+}
+
 function fallbackCourse(matiere: string, niveau: string, chapitre: string) {
   return `### INTRODUCTION
-Ce cours de ${matiere}, niveau ${niveau}, porte sur ${chapitre}. Il est conçu pour construire une vraie maîtrise : comprendre les notions, savoir choisir une méthode, lire un tableau ou un graphe, rédiger correctement et réussir des exercices progressifs.
+Ce cours porte sur ${chapitre} en ${matiere}, niveau ${niveau}. Il aide à comprendre les notions, appliquer les méthodes et réussir les exercices.
 
 ### OBJECTIFS
-- Comprendre les définitions du chapitre.
-- Savoir appliquer les propriétés.
-- Savoir interpréter un tableau ou un graphe.
-- Résoudre des exercices progressifs.
-- Rédiger une correction complète.
-- Préparer une évaluation.
+- Comprendre les définitions.
+- Identifier les propriétés.
+- Appliquer les méthodes.
+- Lire un tableau ou un graphe.
+- Rédiger correctement.
+- Réussir des exercices.
 
-### COURS_DETAILLE
-Le chapitre ${chapitre} doit être travaillé en trois temps : compréhension, application, entraînement. Il faut d’abord identifier les objets du cours, puis apprendre les propriétés importantes. Ensuite, chaque exercice doit être relié à une méthode.
-
-Pour réussir, il faut toujours :
-1. Lire l’énoncé.
-2. Identifier les données.
-3. Repérer la notion du cours.
-4. Vérifier les conditions d’application.
-5. Appliquer la méthode.
-6. Conclure clairement.
+### COURS
+Le chapitre ${chapitre} doit être travaillé avec méthode. Il faut lire l’énoncé, repérer les données, choisir une propriété, vérifier ses conditions et rédiger une conclusion.
 
 ### TABLEAUX
-| Notion | Rôle | Méthode | Piège |
-|---|---|---|---|
-| Définition | Donner le sens précis | La citer avant utilisation | Approximation |
-| Propriété | Résoudre plus vite | Vérifier les conditions | Application automatique |
-| Graphe | Visualiser | Lire axes et variations | Interprétation trop rapide |
-| Exercice | S’entraîner | Corriger ses erreurs | Sauter les étapes |
+| Élément | Rôle |
+|---|---|
+| Définition | Comprendre |
+| Propriété | Résoudre |
+| Méthode | Organiser |
 
 ### METHODES
-Méthode 1 : Identifier la notion.
-Méthode 2 : Vérifier les conditions.
-Méthode 3 : Appliquer la propriété.
-Méthode 4 : Rédiger une conclusion.
+1. Lire l’énoncé.
+2. Repérer les données.
+3. Choisir la méthode.
+4. Conclure.
 
-### EXEMPLES_CORRIGES
-Exemple 1 : application directe.
-Correction : on applique la définition puis on conclut.
+### EXEMPLES
+Exemple : appliquer une propriété du cours.
+Correction : vérifier les conditions, appliquer et conclure.
 
-Exemple 2 : exercice avec méthode.
-Correction : on identifie la propriété, on vérifie les conditions et on applique.
-
-### EXERCICES_CORRIGES
-Exercice 1 : donner une définition du chapitre.
-Correction courte : citer la définition.
-Correction détaillée : préciser les conditions et le contexte.
+### EXERCICES
+Exercice : résoudre une question du chapitre.
+Correction courte : appliquer la méthode.
+Correction détaillée : détailler les étapes et conclure.
 
 ### A_RETENIR
-Comprendre, appliquer, rédiger, corriger.`;
+Comprendre, pratiquer, corriger.`;
 }
