@@ -1,6 +1,6 @@
 export const metadata = {
-  title: "EduAI - Soutien scolaire",
-  description: "Cours de maths, physique et IA avec visio et génération de cours",
+  title: "EduAI",
+  description: "Soutien scolaire IA",
 };
 
 export default function RootLayout({
@@ -10,9 +10,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr">
-      <body style={{ margin: 0 }}>
-        {children}
-      </body>
+      <body style={{ margin: 0 }}>{children}</body>
     </html>
   );
 }
