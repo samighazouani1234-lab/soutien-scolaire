@@ -1,0 +1,227 @@
+import { NextResponse } from "next/server";
+
+export const runtime = "nodejs";
+
+type Exercise = {
+  id: number;
+  level: "Facile" | "Moyen" | "Difficile" | "Type bac";
+  title: string;
+  statement: string;
+  correction: string;
+};
+
+export async function POST(req: Request) {
+  const body = await req.json().catch(() => ({}));
+
+  const matiere = safe(body?.matiere || "Mathématiques");
+  const niveau = safe(body?.niveau || "Terminale");
+  const chapitre = safe(body?.chapitre || "Limites");
+
+  const fallback = buildFallbackExercises(matiere, niveau, chapitre);
+  const apiKey = process.env.TOGETHER_API_KEY;
+
+  if (!apiKey) {
+    return NextResponse.json({ exercises: fallback });
+  }
+
+  try {
+    const prompt = `
+Tu es un professeur expert.
+Génère exactement 50 exercices scolaires.
+
+Matière: ${matiere}
+Niveau: ${niveau}
+Chapitre: ${chapitre}
+
+Réponds uniquement en JSON strict, sans markdown, sous cette forme:
+[
+  {
+    "id": 1,
+    "level": "Facile",
+    "title": "titre précis",
+    "statement": "énoncé complet",
+    "correction": "correction détaillée"
+  }
+]
+
+Contraintes:
+- exactement 50 objets
+- 10 Facile, 15 Moyen, 15 Difficile, 10 Type bac
+- exercices non génériques
+- chaque exercice doit être lié au chapitre exact
+- correction détaillée mais concise
+`;
+
+    const response = await fetch("https://api.together.xyz/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: process.env.TOGETHER_MODEL || "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.25,
+        max_tokens: 6500,
+      }),
+    });
+
+    const json = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json({ exercises: fallback });
+    }
+
+    const raw = json?.choices?.[0]?.message?.content;
+    const parsed = parseJsonArray(raw);
+
+    if (!parsed) {
+      return NextResponse.json({ exercises: fallback });
+    }
+
+    const exercises = normalizeExercises(parsed, fallback);
+    return NextResponse.json({ exercises });
+  } catch {
+    return NextResponse.json({ exercises: fallback });
+  }
+}
+
+export async function GET() {
+  return NextResponse.json({ ok: true });
+}
+
+function safe(value: string) {
+  return String(value).replace(/[<>]/g, "").trim();
+}
+
+function parseJsonArray(raw: unknown) {
+  if (typeof raw !== "string") return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    const match = raw.match(/\[[\s\S]*\]/);
+    if (!match) return null;
+
+    try {
+      const parsed = JSON.parse(match[0]);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+}
+
+function normalizeExercises(value: any[], fallback: Exercise[]): Exercise[] {
+  const allowed = ["Facile", "Moyen", "Difficile", "Type bac"];
+
+  const cleaned = value
+    .map((item, index) => {
+      const level = allowed.includes(String(item?.level)) ? String(item.level) : fallback[index]?.level || "Facile";
+
+      return {
+        id: Number(item?.id || index + 1),
+        level,
+        title: String(item?.title || fallback[index]?.title || "Exercice"),
+        statement: String(item?.statement || fallback[index]?.statement || ""),
+        correction: String(item?.correction || fallback[index]?.correction || ""),
+      } as Exercise;
+    })
+    .filter((item) => item.title && item.statement && item.correction)
+    .slice(0, 50);
+
+  if (cleaned.length < 20) return fallback;
+  return cleaned;
+}
+
+function buildFallbackExercises(matiere: string, niveau: string, chapitre: string): Exercise[] {
+  const low = `${matiere} ${chapitre}`.toLowerCase();
+
+  if (low.includes("dérivation") || low.includes("derivation")) {
+    const base: Exercise[] = [
+      make(1, "Facile", "Dériver une puissance", "Calculer la dérivée de f(x)=x².", "On utilise (x²)'=2x, donc f'(x)=2x."),
+      make(2, "Facile", "Dériver une fonction affine", "Calculer la dérivée de f(x)=3x+5.", "La dérivée de ax+b est a, donc f'(x)=3."),
+      make(3, "Facile", "Dériver un polynôme", "Calculer la dérivée de f(x)=x²+4x-1.", "On dérive terme à terme : f'(x)=2x+4."),
+      make(4, "Facile", "Coefficient directeur", "Pour f(x)=x², calculer le coefficient directeur de la tangente en x=3.", "f'(x)=2x donc f'(3)=6."),
+      make(5, "Facile", "Signe de la dérivée", "Si f'(x)>0 sur un intervalle I, que peut-on dire de f sur I ?", "f est croissante sur I."),
+      make(6, "Facile", "Constante", "Calculer la dérivée de f(x)=7.", "La dérivée d’une constante est 0, donc f'(x)=0."),
+      make(7, "Facile", "Inverse", "Calculer la dérivée de f(x)=1/x sur ]0;+∞[.", "La dérivée de 1/x est -1/x²."),
+      make(8, "Facile", "Racine carrée", "Calculer la dérivée de f(x)=√x sur ]0;+∞[.", "La dérivée de √x est 1/(2√x)."),
+      make(9, "Facile", "Lecture graphique", "Une tangente monte de gauche à droite. Le nombre dérivé est-il positif ou négatif ?", "Il est positif car la pente est positive."),
+      make(10, "Facile", "Minimum local", "Si f' passe de négatif à positif en a, que peut-on dire de f ?", "f admet un minimum local en a.")
+    ];
+
+    const more = Array.from({ length: 40 }, (_, index) => {
+      const id = index + 11;
+
+      if (id <= 25) {
+        return make(
+          id,
+          "Moyen",
+          "Étude de variations",
+          `Soit f(x)=x²-${id}x+1. Étudier les variations de f.`,
+          `f'(x)=2x-${id}. On résout f'(x)=0, soit x=${id}/2. La fonction décroît avant cette valeur puis croît après.`
+        );
+      }
+
+      if (id <= 40) {
+        const a = id - 30;
+        return make(
+          id,
+          "Difficile",
+          "Tangente à une courbe",
+          `Pour f(x)=x³-${a}x, déterminer l'équation de la tangente en x=1.`,
+          `f'(x)=3x²-${a}. Donc f'(1)=${3-a}. f(1)=${1-a}. La tangente est y=${3-a}(x-1)+${1-a}.`
+        );
+      }
+
+      return make(
+        id,
+        "Type bac",
+        "Étude complète",
+        "Étudier une fonction polynôme : dérivée, signe de la dérivée, variations et tangente en un point.",
+        "On calcule f', on résout f'(x)=0, on construit le tableau de signes, puis le tableau de variations. Pour la tangente, on utilise y=f'(a)(x-a)+f(a)."
+      );
+    });
+
+    return base.concat(more);
+  }
+
+  if (low.includes("limite")) {
+    return Array.from({ length: 50 }, (_, index) => {
+      const id = index + 1;
+
+      if (id <= 10) {
+        return make(id, "Facile", "Limite directe", "Calculer la limite de 3x+2 quand x tend vers +∞.", "Comme 3x tend vers +∞, la limite vaut +∞.");
+      }
+
+      if (id <= 25) {
+        return make(id, "Moyen", "Quotient de polynômes", "Calculer la limite en +∞ de (2x²+1)/(x²-3).", "On divise par x². On obtient (2+1/x²)/(1-3/x²), donc la limite vaut 2.");
+      }
+
+      if (id <= 40) {
+        return make(id, "Difficile", "Forme indéterminée", "Étudier la limite en +∞ de x²-3x.", "On factorise par x² : x²(1-3/x). Le facteur tend vers 1 et x² vers +∞, donc la limite vaut +∞.");
+      }
+
+      return make(id, "Type bac", "Synthèse limites", "Étudier une limite avec factorisation puis interpréter graphiquement le résultat.", "On identifie la forme indéterminée, on factorise par le terme dominant, on calcule la limite puis on conclut sur l'asymptote ou le comportement graphique.");
+    });
+  }
+
+  return Array.from({ length: 50 }, (_, index) => {
+    const id = index + 1;
+    const level = id <= 10 ? "Facile" : id <= 25 ? "Moyen" : id <= 40 ? "Difficile" : "Type bac";
+
+    return make(
+      id,
+      level,
+      `${chapitre} — exercice ${level.toLowerCase()}`,
+      `Exercice de ${matiere} niveau ${niveau} sur le chapitre ${chapitre}.`,
+      "Correction : identifier les données, choisir la propriété du chapitre, appliquer la méthode puis conclure clairement."
+    );
+  });
+}
+
+function make(id: number, level: Exercise["level"], title: string, statement: string, correction: string): Exercise {
+  return { id, level, title, statement, correction };
+}
