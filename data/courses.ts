@@ -1,9 +1,9 @@
 export const coursesData: Record<string, Record<string, string[]>> = {
   Mathématiques: {
-    "6e": ["Fractions", "Proportionnalité", "Géométrie"],
+    "6e": ["Fractions", "Proportionnalité", "Aires et périmètres"],
     "5e": ["Nombres relatifs", "Triangles", "Pourcentages"],
-    "4e": ["Théorème de Pythagore", "Puissances", "Statistiques"],
-    "3e": ["Équations", "Fonctions", "Théorème de Thalès"],
+    "4e": ["Pythagore", "Puissances", "Statistiques"],
+    "3e": ["Équations", "Fonctions affines", "Thalès"],
     Seconde: ["Fonctions", "Vecteurs", "Probabilités"],
     Première: ["Dérivation", "Suites", "Produit scalaire"],
     Terminale: ["Limites", "Fonction logarithme", "Équations différentielles", "Loi binomiale"],
@@ -19,3 +19,5 @@ export const coursesData: Record<string, Record<string, string[]>> = {
     Terminale: ["Acides bases", "Piles", "Cinétique chimique"],
   },
 };
+
+export const data = coursesData;
