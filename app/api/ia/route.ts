@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+export const runtime = "nodejs";
+
 const MODEL =
   process.env.TOGETHER_MODEL || "meta-llama/Llama-3.3-70B-Instruct-Turbo";
 
@@ -23,7 +25,7 @@ export async function POST(req: Request) {
     const prompt = `
 Tu es un professeur français expert.
 
-Crée un cours scolaire sérieux, fiable, détaillé, adapté au niveau ${niveau}.
+Crée un cours scolaire fiable, détaillé, adapté au niveau ${niveau}.
 
 Matière : ${matiere}
 Chapitre : ${chapitre}
@@ -42,7 +44,8 @@ Réponds uniquement avec ces titres exacts :
 Règles :
 - pas de HTML
 - pas de JSON
-- pas de titre coupé comme _DETAILLE
+- pas de titre coupé
+- pas de bloc de code
 - cours détaillé
 - 6 exemples corrigés
 - 15 exercices corrigés
@@ -72,13 +75,18 @@ Règles :
     const content = result?.choices?.[0]?.message?.content;
 
     return NextResponse.json({
-      content: typeof content === "string" && content.trim()
-        ? sanitizeCourse(content)
-        : fallbackCourse(matiere, niveau, chapitre),
+      content:
+        typeof content === "string" && content.trim()
+          ? sanitizeCourse(content)
+          : fallbackCourse(matiere, niveau, chapitre),
     });
   } catch {
     return NextResponse.json({ content: fallbackCourse(matiere, niveau, chapitre) });
   }
+}
+
+export async function GET() {
+  return NextResponse.json({ ok: true });
 }
 
 function sanitizeCourse(raw: string) {
